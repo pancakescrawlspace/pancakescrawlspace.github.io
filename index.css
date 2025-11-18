@@ -7,4 +7,5 @@ body {
 
 body > div {
   background-color: #ffffff;
+  padding: 12px;
 }
