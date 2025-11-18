@@ -1,0 +1,10 @@
+body {
+  background-color: #dddddd; 
+  font-family: 'Courier'; 
+  padding-left: 10%; 
+  padding-right: 10%;
+}
+
+body > div {
+  background-color: #ffffff;
+}
