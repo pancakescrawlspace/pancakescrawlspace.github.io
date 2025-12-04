@@ -1,20 +1,22 @@
 body {
   background-color: #dddddd;
   font-family: "Courier";
-  padding-left: 20%;
-  padding-right: 20%;
-  padding-top: 40px;
-  padding-bottom: 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
 }
 
 body > div {
+  font-family: "Courier";
+  padding: 40px 20% 40px;
+}
+
+body > div > div {
   background-color: #ffffff;
   padding: 24px;
 }
 
-body > div > p {
+body > div > div:not(:last-child) {
+  margin-bottom: 20px;
+}
+
+body > div > div > p {
   line-height: 110%;
 }
