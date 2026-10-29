@@ -12,9 +12,15 @@
     --muted: #6d6a63;
     --line: #dedbd3;
     --accent: #2f5fb3;
+    --accent-soft: #e3ebf9;
     --accent-text: #ffffff;
     --yes: #23753a;
+    --yes-soft: #dcefe0;
     --no: #b3372f;
+    --no-soft: #f8e0dd;
+    --key-white: #fdfdfb;
+    --key-black: #2a2926;
+    --key-line: #b9b5ab;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -24,9 +30,15 @@
       --muted: #9a968d;
       --line: #36342f;
       --accent: #7aa2ec;
+      --accent-soft: #233150;
       --accent-text: #10131a;
       --yes: #6fcf87;
+      --yes-soft: #1f3a26;
       --no: #f08a80;
+      --no-soft: #43231f;
+      --key-white: #e9e7e1;
+      --key-black: #0d0d0c;
+      --key-line: #4a4741;
     }
   }
   * { box-sizing: border-box; }
@@ -36,16 +48,140 @@
     color: var(--text);
     font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
-  main { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
-  h1 { font-size: 1.6rem; margin: 0 0 .25rem; letter-spacing: .02em; }
-  .lede { margin: 0 0 1.25rem; color: var(--muted); }
+  main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  h1 { font-size: 1.6rem; margin: 0; letter-spacing: .02em; }
+  h2 { font-size: 1rem; margin: 0 0 .5rem; }
+  .lede { margin: .25rem 0 1.25rem; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .small { font-size: .9rem; }
   .panel {
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 1rem;
     margin-bottom: 1rem;
   }
+  input, select, button { font: inherit; color: inherit; }
+  button {
+    padding: .5rem .95rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  kbd {
+    font: .75em ui-monospace, monospace;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0 .3em;
+    margin-left: .35em;
+  }
+  button.primary kbd { color: inherit; border-color: currentColor; opacity: .7; }
+  code { font: .92em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  /* the score */
+  #score { display: flex; gap: .5rem; flex-wrap: wrap; font-size: .9rem; }
+  .chip { padding: .15rem .6rem; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+  .chip b { font-variant-numeric: tabular-nums; }
+
+  /* the round */
+  #stage { text-align: center; padding: 1.5rem 1rem; }
+  .round { color: var(--muted); font-size: .9rem; margin: 0; }
+  .start-note { font-size: 2.6rem; font-weight: 700; line-height: 1.1; margin: .25rem 0; }
+  .start-label { color: var(--muted); margin: 0 0 1rem; }
+  .play { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+  .play .big { font-size: 1.1rem; padding: .7rem 1.4rem; }
+  #feedback { min-height: 3.2rem; margin: 1rem 0 0; }
+  #feedback .title { font-weight: 700; font-size: 1.15rem; }
+  #feedback.yes .title { color: var(--yes); }
+  #feedback.no .title { color: var(--no); }
+  #notice { margin: .5rem 0 0; }
+
+  /* answering */
+  .tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--line); margin: -.25rem 0 1rem; }
+  .tabs button {
+    border: none; border-bottom: 2px solid transparent; border-radius: 0;
+    background: none; padding: .5rem .8rem; color: var(--muted);
+  }
+  .tabs button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+
+  .keyboard-scroll { overflow-x: auto; padding-bottom: .25rem; }
+  .keyboard {
+    --key-min: 1.9rem;
+    position: relative; display: flex; height: 9.5rem; user-select: none; -webkit-user-select: none;
+    min-width: calc(var(--whites) * var(--key-min));
+  }
+  @media (max-width: 34rem) {
+    .keyboard { --key-min: 1.25rem; height: 8rem; }
+    .key.white { font-size: .6rem; }
+    .play .big { font-size: 1rem; padding: .6rem 1rem; }
+  }
+  @media (hover: none) {
+    kbd { display: none; }
+  }
+  .key { padding: 0; border-radius: 0 0 6px 6px; touch-action: manipulation; }
+  .key.white {
+    flex: 1; min-width: var(--key-min);
+    background: var(--key-white); border: 1px solid var(--key-line); margin-right: -1px;
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+    padding-bottom: .4rem; color: #55524b; font-size: .72rem;
+  }
+  .key.black {
+    position: absolute; top: 0; height: 60%; z-index: 1;
+    background: var(--key-black); border: 1px solid var(--key-black);
+  }
+  .key:hover:not(:disabled) { border-color: var(--key-line); filter: brightness(.94); }
+  .key.black:hover { filter: brightness(1.6); }
+  .key.start::before {
+    content: ""; width: .55rem; height: .55rem; border-radius: 50%;
+    background: var(--accent); margin-bottom: .3rem;
+  }
+  .key.black.start::before { display: block; margin: auto auto .5rem; }
+  .key.black.start { display: flex; }
+  .key.wrong { background: var(--no) !important; border-color: var(--no) !important; color: #fff; }
+  .key.right { background: var(--yes) !important; border-color: var(--yes) !important; color: #fff; }
+  .legend { margin: .6rem 0 0; }
+  .legend .dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--accent); }
+
+  .intervals h3 { font-size: .9rem; color: var(--muted); font-weight: 600; margin: 0 0 .4rem; }
+  .intervals .group + .group { margin-top: 1rem; }
+  .interval-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: .4rem; }
+  .interval-grid button { text-align: left; line-height: 1.25; padding: .45rem .6rem; }
+  .interval-grid b { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .interval-grid span { font-size: .8rem; color: var(--muted); }
+  .interval-grid button.wrong { background: var(--no-soft); border-color: var(--no); }
+  .interval-grid button.right { background: var(--yes-soft); border-color: var(--yes); }
+
+  #type-form { display: flex; gap: .5rem; }
+  #answer {
+    flex: 1; min-width: 0;
+    padding: .5rem .6rem;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .syntax { margin: .75rem 0 0; padding-left: 1.1rem; }
+  .syntax li + li { margin-top: .35rem; }
+
+  /* history */
+  #history { list-style: none; margin: 0; padding: 0; }
+  #history li {
+    display: grid; grid-template-columns: 1fr auto; gap: .1rem 1rem;
+    padding: .45rem 0; border-top: 1px solid var(--line);
+  }
+  #history li:first-child { border-top: none; }
+  #history .what { font-weight: 600; }
+  #history .how { color: var(--muted); font-size: .9rem; grid-column: 1; }
+  #history .result { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-size: .85rem; padding: .1rem .55rem; border-radius: 999px; }
+  #history .result.first { background: var(--yes-soft); color: var(--yes); }
+  #history .result.later { background: var(--accent-soft); color: var(--accent); }
+  #history .result.shown { background: var(--no-soft); color: var(--no); }
+
+  /* settings */
   summary { cursor: pointer; font-weight: 600; }
   .fields {
     display: grid;
@@ -55,57 +191,98 @@
   }
   label { display: block; font-size: .9rem; color: var(--muted); }
   label.check { display: flex; gap: .5rem; align-items: center; color: var(--text); font-size: 1rem; }
-  input, select, button { font: inherit; color: inherit; }
-  input[type=text], input[type=number], select {
-    display: block;
-    width: 100%;
-    margin-top: .2rem;
-    padding: .4rem .5rem;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 6px;
+  .fields input[type=text], .fields input[type=number], .fields select {
+    display: block; width: 100%; margin-top: .2rem; padding: .4rem .5rem;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
   }
-  button {
-    padding: .45rem .9rem;
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  button:hover:not(:disabled) { border-color: var(--muted); }
-  button:disabled { opacity: .5; cursor: default; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
   .actions { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
   .error { color: var(--no); }
-  #log {
-    font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    min-height: 10rem;
-    max-height: 55vh;
-    overflow-y: auto;
-    margin: 0;
-  }
-  #log .muted { color: var(--muted); }
-  #log .yes { color: var(--yes); }
-  #log .no { color: var(--no); }
-  #log .answer { font-weight: 700; }
-  #answer-form { display: flex; gap: .5rem; align-items: center; margin-top: .75rem; }
-  #prompt { font: 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; color: var(--muted); }
-  #answer { flex: 1; min-width: 0; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .keys { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
-  kbd { font: .8em ui-monospace, monospace; color: var(--muted); }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <main>
-  <h1>solfege</h1>
-  <p class="lede">A start note, then another note nearby. Name it, or give the interval from the start note to it.</p>
+  <header>
+    <h1>solfege</h1>
+    <div id="score" hidden>
+      <span class="chip"><b id="score-first">0</b> first try</span>
+      <span class="chip"><b id="score-later">0</b> more tries</span>
+      <span class="chip"><b id="score-shown">0</b> shown</span>
+    </div>
+  </header>
+  <p class="lede">Listen to a start note and then another note. Which note was the second one?</p>
+
+  <section id="welcome" class="panel">
+    <p style="margin-top: 0">Each round plays the start note, then a second note near it. Answer by pressing the
+      second note on the keyboard, by choosing the interval between the two, or by typing its name. Get it
+      right and the next round starts.</p>
+    <p class="muted small">The settings below choose the start note, how far away the second note can be, and the
+      sound.</p>
+    <button type="button" class="primary big" id="welcome-start">Start</button>
+  </section>
+
+  <div id="playing" hidden>
+    <section id="stage" class="panel">
+      <p class="round" id="round"></p>
+      <p class="start-note" id="start-note"></p>
+      <p class="start-label" id="start-label"></p>
+      <div class="play">
+        <button type="button" class="primary big" id="play-both">Play both <kbd>Space</kbd></button>
+        <button type="button" class="big" id="play-second">Second note <kbd>P</kbd></button>
+        <button type="button" class="big" id="give-up">Show answer <kbd>S</kbd></button>
+        <button type="button" class="primary big" id="next" hidden>Next note <kbd>N</kbd></button>
+      </div>
+      <div id="feedback" role="status" aria-live="polite"></div>
+      <p id="notice" class="muted small" hidden></p>
+    </section>
+
+    <section class="panel">
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="keys" aria-selected="true">Keyboard</button>
+        <button type="button" role="tab" data-tab="intervals" aria-selected="false">Interval</button>
+        <button type="button" role="tab" data-tab="type" aria-selected="false">Type it</button>
+      </div>
+
+      <div data-panel="keys" role="tabpanel">
+        <div class="keyboard-scroll"><div class="keyboard" id="keyboard"></div></div>
+        <p class="legend muted small"><span class="dot"></span> the start note. Pressing a key plays it and
+          answers with that exact note.</p>
+      </div>
+
+      <div data-panel="intervals" role="tabpanel" class="intervals" id="intervals" hidden></div>
+
+      <div data-panel="type" role="tabpanel" hidden>
+        <form id="type-form" autocomplete="off">
+          <input type="text" id="answer" aria-label="Note or interval" placeholder="sol, fis, eb5, 3-, -5 …"
+                 autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
+          <button type="submit" class="primary">Check</button>
+        </form>
+        <ul class="syntax small">
+          <li><b>A note:</b> <code>c d e f g a b</code> with <code>#</code> or <code>b</code>, Dutch
+            <code>fis</code>, <code>bes</code>, <code>es</code>, <code>as</code>, or fixed do: <code>do re mi fa
+            sol la si</code>. Any octave counts. To be exact, add one: <code>d4</code>, <code>eb5</code>
+            (middle C is <code>c4</code>), or LilyPond style <code>d'</code>, <code>bes,</code>.</li>
+          <li><b>An interval</b> from the start note: <code>2</code> is a major second, <code>2-</code> a minor
+            second, <code>4+</code> or <code>5-</code> the tritone, <code>8</code> an octave. For 1, 4, 5 and 8,
+            <code>+</code> and <code>-</code> mean augmented and diminished; for the others, <code>-</code> is minor,
+            <code>--</code> diminished and <code>+</code> augmented.</li>
+          <li><b>A direction:</b> put <code>+</code> or <code>-</code> in front for up or down, so <code>-3-</code>
+            is a minor third down. Without one, either direction counts.</li>
+          <li><b>Commands:</b> an empty answer or <code>r</code> plays both notes again, <code>p</code> the second
+            note, <code>s</code> shows the answer and <code>n</code> goes on to the next note.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="panel" id="history-panel" hidden>
+      <h2>So far</h2>
+      <ul id="history"></ul>
+    </section>
+  </div>
 
   <form id="options" class="panel">
-    <details id="options-details" open>
-      <summary>Options</summary>
+    <details id="options-details">
+      <summary>Settings</summary>
       <div class="fields">
         <label>Start note
           <input type="text" id="opt-start" value="c4" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -130,62 +307,21 @@
           <label class="check"><input type="checkbox" id="opt-chromatic"> All twelve notes</label>
         </div>
       </div>
-      <p class="muted" style="color: var(--muted); font-size: .9rem; margin: .75rem 0 0">
-        The start note is any note name (<code>c4</code>, <code>g</code>, <code>fis'</code>, <code>bes,</code>; without an
-        octave, the one from middle C up), or <code>random</code> for a new one every round.
+      <p class="muted small" style="margin: .75rem 0 0">
+        The start note is any note name (<code>c4</code>, <code>g</code>, <code>fis'</code>, <code>bes,</code>;
+        without an octave, the one from middle C up), or <code>random</code> for a new one every round. The second
+        note comes from the start note's major scale, unless you choose all twelve notes.
       </p>
+      <div class="actions">
+        <button type="submit" class="primary" id="start-button">Start</button>
+        <span id="options-error" class="error" role="alert"></span>
+      </div>
     </details>
-    <div class="actions">
-      <button type="submit" class="primary" id="start-button">Start</button>
-      <span id="options-error" class="error" role="alert"></span>
-    </div>
   </form>
-
-  <section id="game" class="panel" hidden>
-    <pre id="log" aria-live="polite"></pre>
-    <form id="answer-form" autocomplete="off">
-      <span id="prompt"></span>
-      <input type="text" id="answer" aria-label="Answer" autocomplete="off" autocapitalize="off"
-             autocorrect="off" spellcheck="false" enterkeyhint="send">
-    </form>
-    <div class="keys" id="keys">
-      <button type="button" data-cmd="r">Play again <kbd>r</kbd></button>
-      <button type="button" data-cmd="p">Second note <kbd>p</kbd></button>
-      <button type="button" data-cmd="s">Give up <kbd>s</kbd></button>
-      <button type="button" data-cmd="q">Quit <kbd>q</kbd></button>
-      <button type="button" data-cmd="?">Help <kbd>?</kbd></button>
-    </div>
-    <div class="actions" id="again" hidden>
-      <button type="button" class="primary" id="again-button">New game</button>
-    </div>
-  </section>
 </main>
 
 <script>
 "use strict";
-
-const HELP = `Sounds a start note (middle C, unless the options say otherwise),
-then another note nearby, from the major scale of the start note (with
-"All twelve notes", any note).  Name the second note, or the interval
-from the start note to it, to go on to the next one.
-
-Answers
-  notes      c d e f g a b, with accidentals # b / is es (Dutch: fis, bes,
-             es, as, ...) or fixed-do syllables (do re mi fa sol la si/ti).
-             Without an octave any octave counts; add one to be exact:
-             scientific (d4, eb5) or LilyPond absolute (d', bes, c'').
-  intervals  a number counted from the start note: 2 = major second,
-             2- = minor second, 1+ = augmented unison, 4+ = augmented
-             fourth, 5- = diminished fifth, 8 = octave, ...  Perfect
-             intervals (1 4 5 8) take + and - for augmented / diminished;
-             the others take - for minor, -- for diminished and + for
-             augmented.  Optionally prefix + (up) or - (down): -3- = minor
-             third down.  Enharmonic answers count (fis = ges, 4+ = 5-).
-
-Commands while playing
-  Enter / r  play both notes again         p  play only the second note
-  s          show the answer, next note    q  quit
-  ?          this help`;
 
 const MIDDLE_C = 60;
 const PIANO = [21, 108];                   // A0 .. C8
@@ -296,7 +432,9 @@ function noteName(midi) {
   return names.map(n => `${n}${octave - 1}`).join(" / ");
 }
 
-function intervalName(semis) {
+// The parts of an interval's name: its answer ("6-"), its short name
+// ("6-", or "4+ = 5-" for the tritone) and its name in words.
+function intervalParts(semis) {
   const octaves = Math.floor(Math.abs(semis) / 12), rest = Math.abs(semis) % 12;
   let [n, mod] = SIMPLE[rest];
   n += 7 * octaves;
@@ -312,6 +450,11 @@ function intervalName(semis) {
     short += ` = ${n + 1}-`;
     words += ", tritone";
   }
+  return {answer: `${n}${mod}`, short, words};
+}
+
+function intervalName(semis) {
+  const {short, words} = intervalParts(semis);
   const direction = semis > 0 ? "up" : "down";
   return `${short} ${direction} (${words})`;
 }
@@ -472,7 +615,7 @@ function check(answer, target, start) {
     if (midi !== null && midi !== target) return [false, "right note, wrong octave"];
     return [true, null];
   }
-  return [false, "not a note or an interval (? for help)"];
+  return [false, "not a note or an interval"];
 }
 
 // mulberry32: a small seeded generator, for the seed option.
@@ -500,6 +643,9 @@ function candidates(opts, start) {
     && start + d >= PIANO[0] && start + d <= PIANO[1]).map(d => start + d);
 }
 
+// One session: the rounds, the score and what the page shows of them.
+// A round is "asking" until it is answered ("right") or the answer is shown
+// ("shown"); after "right" the next round starts by itself.
 class Game {
   constructor(opts, sound) {
     this.opts = opts;
@@ -509,8 +655,8 @@ class Game {
     this.start = opts.start;
     this.target = null;
     this.rounds = this.firstTime = this.later = this.givenUp = 0;
+    this.phase = "asking";
     this.over = false;
-    this.waiting = false;
   }
 
   choice(list) {
@@ -518,15 +664,7 @@ class Game {
   }
 
   begin() {
-    let first;
-    if (this.randomStart) {
-      first = "A start note (a new one every round)";
-    } else if (this.start === MIDDLE_C) {
-      first = "Middle C";
-    } else {
-      first = noteName(this.start);
-    }
-    print(`${first}, then another note: name it or give the interval (? for help, q to quit).`);
+    renderScore(this);
     const playing = this.nextRound();
     const starts = this.randomStart ? startChoices(this.opts) : [this.start];
     const pitches = new Set(starts.flatMap(s => [s, ...candidates(this.opts, s)]));
@@ -534,109 +672,279 @@ class Game {
   }
 
   nextRound() {
-    this.waiting = false;
+    if (this.over) return null;
     if (this.randomStart) this.start = this.choice(startChoices(this.opts));
     const choices = candidates(this.opts, this.start);
     if (choices.length > 1 && choices.includes(this.target)) {
       choices.splice(choices.indexOf(this.target), 1);
     }
     if (!choices.length) {
-      print("solfege: no notes to choose from; widen the range"
-            + (this.opts.chromatic ? "" : " or choose all twelve notes"), "no");
-      this.end(false);
+      this.over = true;
+      showFeedback("no", "No notes to choose from.",
+                   "Widen the range" + (this.opts.chromatic ? "" : " or choose all twelve notes") + " in the settings.");
       return null;
     }
     this.target = this.choice(choices);
     this.rounds++;
     this.tries = 0;
+    this.phase = "asking";
     this.both = [[this.start, 0.0, 1.0], [this.target, 1.2, 1.4]];
-    setPrompt(this.randomStart ? `[${this.rounds}] from ${noteName(this.start)} ? `
-                               : `[${this.rounds}] ? `);
+    renderRound(this);
     return this.sound.play(this.both);
   }
 
-  answer(raw) {
-    if (this.over || this.waiting) return;
-    const answer = normalize(raw);
-    print([[promptText(), "muted"], [raw, "answer"]]);
-    if (answer === "" || answer === "r") {
-      this.sound.play(this.both);
-    } else if (answer === "p") {
-      this.sound.play([[this.target, 0.0, 1.4]]);
-    } else if (answer === "?" || answer === "help") {
-      print(HELP, "muted");
-    } else if (["q", "quit", "exit"].includes(answer)) {
-      this.end(true);
-    } else if (answer === "s") {
-      this.givenUp++;
-      print(`  It was ${noteName(this.target)}: ${intervalName(this.target - this.start)}.`);
-      this.pause();
-    } else {
-      this.tries++;
-      const [ok, remark] = check(answer, this.target, this.start);
-      if (ok) {
-        if (this.tries === 1) this.firstTime++; else this.later++;
-        print(`  Yes: ${noteName(this.target)}, ${intervalName(this.target - this.start)}.`, "yes");
-        this.pause();
-      } else {
-        print(`  No${remark ? ", " + remark : ""}.`, "no");
-      }
+  playBoth() { this.sound.play(this.both); }
+  playSecond() { this.sound.play([[this.target, 0.0, 1.4]]); }
+
+  // Check an answer; return true if it was right. el is the key or button it came from.
+  answer(text, el) {
+    if (this.phase !== "asking") return false;
+    this.tries++;
+    const [ok, remark] = check(normalize(text), this.target, this.start);
+    if (!ok) {
+      el?.classList.add("wrong");
+      showFeedback("no", "Not that one.", remark ? capitalize(remark) + "." : "Try again, or play the notes once more.");
+      return false;
     }
+    this.phase = "right";
+    if (this.tries === 1) this.firstTime++; else this.later++;
+    el?.classList.add("right");
+    markAnswer(this);
+    showFeedback("yes", "Right!", `${noteName(this.target)} · ${intervalName(this.target - this.start)}`);
+    addHistory(this, this.tries === 1 ? ["first", "first try"] : ["later", `${this.tries} tries`]);
+    renderScore(this);
+    setTimeout(() => this.nextRound(), 1000);
+    return true;
   }
 
-  pause() {
-    this.waiting = true;
-    setPrompt("");
-    setTimeout(() => { if (!this.over) this.nextRound(); }, 600);
+  giveUp() {
+    if (this.phase !== "asking") return;
+    this.phase = "shown";
+    this.givenUp++;
+    markAnswer(this);
+    showFeedback("", `It was ${noteName(this.target)}.`, intervalName(this.target - this.start));
+    addHistory(this, ["shown", "shown"]);
+    renderScore(this);
+    setButtons(this);
+    this.playBoth();
   }
 
-  end(showScore) {
-    if (this.over) return;
+  next() {
+    if (this.phase === "shown") this.nextRound();
+  }
+
+  end() {
     this.over = true;
     this.sound.stop();
-    setPrompt("");
-    if (showScore) {
-      const done = this.firstTime + this.later + this.givenUp;
-      if (this.target !== null && done < this.rounds) {
-        print(`It was ${noteName(this.target)}: ${intervalName(this.target - this.start)}.`);
-      }
-      if (done) {
-        print(`${done} note${done !== 1 ? "s" : ""}: ${this.firstTime} right first time, `
-              + `${this.later} after more tries, ${this.givenUp} given up.`);
-      }
-    }
-    gameOver();
   }
 }
 
 // --- the page ----------------------------------------------------------------
 
 const $ = id => document.getElementById(id);
-const log = $("log"), answerInput = $("answer");
+const capitalize = s => s[0].toUpperCase() + s.slice(1);
+const isBlack = midi => [1, 3, 6, 8, 10].includes(midi % 12);
 let game = null, sound = null;
 
-// Print a line: a string, or a list of [text, class] parts.
-function print(line, cls) {
-  const div = document.createElement("div");
-  for (const [text, c] of typeof line === "string" ? [[line, cls]] : line) {
-    const span = document.createElement("span");
-    span.textContent = text;
-    if (c) span.className = c;
-    div.append(span);
+function showFeedback(kind, title, detail) {
+  const box = $("feedback");
+  box.className = kind;
+  box.replaceChildren();
+  const t = document.createElement("div");
+  t.className = "title";
+  t.textContent = title;
+  const d = document.createElement("div");
+  d.className = "muted";
+  d.textContent = detail;
+  box.append(t, d);
+}
+
+function renderScore(g) {
+  $("score-first").textContent = g.firstTime;
+  $("score-later").textContent = g.later;
+  $("score-shown").textContent = g.givenUp;
+}
+
+function setButtons(g) {
+  const shown = g.phase === "shown";
+  $("next").hidden = !shown;
+  $("give-up").hidden = shown;
+}
+
+function renderRound(g) {
+  $("round").textContent = `Note ${g.rounds}`;
+  $("start-note").textContent = noteName(g.start);
+  $("start-label").textContent = g.randomStart ? "the start note, new every round"
+                               : g.start === MIDDLE_C ? "middle C, the start note" : "the start note";
+  $("feedback").replaceChildren();
+  $("feedback").className = "";
+  setButtons(g);
+  renderKeyboard(g);
+  renderIntervals(g);
+}
+
+// The keys from the lowest to the highest note the round can have, widened to
+// white keys at both ends.
+function renderKeyboard(g) {
+  let lo = Math.max(PIANO[0], g.start - (g.opts.up ? 0 : g.opts.range));
+  let hi = Math.min(PIANO[1], g.start + g.opts.range);
+  if (isBlack(lo)) lo--;
+  if (isBlack(hi)) hi++;
+  const whites = range(lo, hi).filter(n => !isBlack(n));
+  const width = 100 / whites.length;
+  const keyboard = $("keyboard");
+  keyboard.replaceChildren();
+  keyboard.style.setProperty("--whites", whites.length);
+  for (const pitch of range(lo, hi)) {
+    const key = document.createElement("button");
+    key.type = "button";
+    key.className = "key " + (isBlack(pitch) ? "black" : "white");
+    key.dataset.pitch = pitch;
+    key.setAttribute("aria-label", noteName(pitch) + (pitch === g.start ? ", the start note" : ""));
+    if (pitch === g.start) key.classList.add("start");
+    if (isBlack(pitch)) {
+      const left = whites.filter(n => n < pitch).length * width;
+      key.style.left = `calc(${left}% - ${width * 0.31}%)`;
+      key.style.width = `${width * 0.62}%`;
+    } else if (pitch % 12 === 0 || pitch === g.start) {
+      key.append(noteName(pitch));
+    }
+    keyboard.append(key);
   }
-  log.append(div);
-  log.scrollTop = log.scrollHeight;
+  // When the keys don't all fit, start with the start note in the middle.
+  const scroller = keyboard.parentElement, start = keyboard.querySelector(".start");
+  scroller.scrollLeft = start.offsetLeft + start.offsetWidth / 2 - scroller.clientWidth / 2;
 }
 
-const promptText = () => $("prompt").textContent;
-const setPrompt = text => { $("prompt").textContent = text; };
-
-function gameOver() {
-  answerInput.disabled = true;
-  for (const b of $("keys").querySelectorAll("button")) b.disabled = true;
-  $("again").hidden = false;
-  $("again-button").focus();
+// A button for every interval in range, down and up.
+function renderIntervals(g) {
+  const box = $("intervals");
+  box.replaceChildren();
+  const directions = g.opts.up ? [[1, "Up"]] : [[-1, "Down"], [1, "Up"]];
+  for (const [sign, label] of directions) {
+    const group = document.createElement("div");
+    group.className = "group";
+    const h = document.createElement("h3");
+    h.textContent = `${label} from ${noteName(g.start)}`;
+    const grid = document.createElement("div");
+    grid.className = "interval-grid";
+    for (let semis = 1; semis <= g.opts.range; semis++) {
+      const {answer, short, words} = intervalParts(semis);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.answer = (sign > 0 ? "+" : "-") + answer;
+      button.dataset.semis = sign * semis;
+      const b = document.createElement("b");
+      b.textContent = short;
+      const span = document.createElement("span");
+      span.textContent = words;
+      button.append(b, span);
+      grid.append(button);
+    }
+    group.append(h, grid);
+    box.append(group);
+  }
 }
+
+// Show the answer on the keyboard and among the intervals.
+function markAnswer(g) {
+  $("keyboard").querySelector(`[data-pitch="${g.target}"]`)?.classList.add("right");
+  $("intervals").querySelector(`[data-semis="${g.target - g.start}"]`)?.classList.add("right");
+}
+
+function addHistory(g, [cls, text]) {
+  const li = document.createElement("li");
+  const what = document.createElement("span");
+  what.className = "what";
+  what.textContent = `${noteName(g.start)} → ${noteName(g.target)}`;
+  const how = document.createElement("span");
+  how.className = "how";
+  how.textContent = intervalName(g.target - g.start);
+  const result = document.createElement("span");
+  result.className = `result ${cls}`;
+  result.textContent = text;
+  li.append(what, result, how);
+  $("history").prepend(li);
+  while ($("history").children.length > 10) $("history").lastChild.remove();
+  $("history-panel").hidden = false;
+}
+
+// --- tabs, keys and buttons --------------------------------------------------
+
+function selectTab(name) {
+  for (const tab of document.querySelectorAll("[role=tab]")) {
+    tab.setAttribute("aria-selected", tab.dataset.tab === name);
+  }
+  for (const panel of document.querySelectorAll("[role=tabpanel]")) {
+    panel.hidden = panel.dataset.panel !== name;
+  }
+  try { localStorage.setItem("solfege.tab", name); } catch {}
+  if (name === "type" && game) $("answer").focus();
+}
+
+for (const tab of document.querySelectorAll("[role=tab]")) {
+  tab.addEventListener("click", () => selectTab(tab.dataset.tab));
+}
+try {
+  const saved = localStorage.getItem("solfege.tab");
+  if (saved && document.querySelector(`[data-tab="${saved}"]`)) selectTab(saved);
+} catch {}
+
+$("keyboard").addEventListener("click", e => {
+  const key = e.target.closest(".key");
+  if (!key || !game) return;
+  const pitch = Number(key.dataset.pitch);
+  // An exact answer, such as "c#4"; after the round, a key only plays.
+  if (game.phase === "asking") {
+    const right = game.answer(SHARPS[pitch % 12].toLowerCase() + (Math.floor(pitch / 12) - 1), key);
+    if (right) return;
+  }
+  sound.play([[pitch, 0.0, 0.9]]);
+});
+
+$("intervals").addEventListener("click", e => {
+  const button = e.target.closest("button[data-answer]");
+  if (button && game) game.answer(button.dataset.answer, button);
+});
+
+$("type-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const text = $("answer").value;
+  if (!game) return;
+  // The terminal's commands work here too.
+  const command = {"": "playBoth", r: "playBoth", p: "playSecond", s: "giveUp", n: "next"}[normalize(text)];
+  if (command) {
+    game[command]();
+    $("answer").value = "";
+  } else if (game.answer(text)) {
+    $("answer").value = "";
+  } else {
+    $("answer").select();
+  }
+});
+
+$("play-both").addEventListener("click", () => game?.playBoth());
+$("play-second").addEventListener("click", () => game?.playSecond());
+$("give-up").addEventListener("click", () => game?.giveUp());
+$("next").addEventListener("click", () => game?.next());
+
+// Keyboard shortcuts, unless you are typing. Space plays even when a key or
+// button has the focus; Enter then presses that button.
+document.addEventListener("keydown", e => {
+  if (!game || e.ctrlKey || e.metaKey || e.altKey) return;
+  const target = e.target instanceof Element ? e.target : document.body;
+  if (target.closest("input, select, textarea, summary")) return;
+  const key = e.key.toLowerCase();
+  if (key === "enter" && target.closest("button")) return;
+  if (key === " " || key === "r") game.playBoth();
+  else if (key === "p") game.playSecond();
+  else if (key === "s") game.giveUp();
+  else if (key === "n" || key === "enter") game.next();
+  else return;
+  e.preventDefault();
+});
+
+// --- settings ----------------------------------------------------------------
 
 for (const [i, name] of INSTRUMENTS.entries()) {
   const label = name.replace("__", " + ").replaceAll("_", " ");
@@ -646,7 +954,7 @@ for (const [i, name] of INSTRUMENTS.entries()) {
 const syncSound = () => { $("opt-program").disabled = $("opt-sound").value === "synth"; };
 $("opt-sound").addEventListener("change", syncSound);
 
-// The options can come from the URL, named like the command-line options:
+// The settings can come from the URL, named like the command-line options:
 // ?start=g&range=7&up&chromatic&synth&program=40&seed=1
 function readUrl() {
   const q = new URLSearchParams(location.search);
@@ -707,38 +1015,27 @@ function newGame() {
   }
   $("options-error").textContent = "";
   writeUrl(opts);
-  game?.end(false);
-  sound?.stop();
+  game?.end();
   sound?.ctx.close();
-  sound = new Sound(opts.synth, opts.program,
-                    () => print("(the samples couldn't be loaded; using the built-in tone)", "muted"));
-  log.textContent = "";
-  answerInput.disabled = false;
-  for (const b of $("keys").querySelectorAll("button")) b.disabled = false;
-  $("again").hidden = true;
-  $("game").hidden = false;
+  sound = new Sound(opts.synth, opts.program, () => {
+    $("notice").textContent = "The instrument samples couldn't be loaded, so this uses the built-in tone.";
+    $("notice").hidden = false;
+  });
+  $("notice").hidden = true;
+  $("history").replaceChildren();
+  $("history-panel").hidden = true;
+  $("welcome").hidden = true;
+  $("playing").hidden = false;
+  $("score").hidden = false;
   $("options-details").open = false;
-  $("start-button").textContent = "Restart";
+  $("start-button").textContent = "Start over";
   game = new Game(opts, sound);
   game.begin();
-  answerInput.focus();
+  $("play-both").focus();
 }
 
 $("options").addEventListener("submit", e => { e.preventDefault(); newGame(); });
-$("again-button").addEventListener("click", newGame);
-
-$("answer-form").addEventListener("submit", e => {
-  e.preventDefault();
-  game?.answer(answerInput.value);
-  answerInput.value = "";
-});
-
-$("keys").addEventListener("click", e => {
-  const button = e.target.closest("button[data-cmd]");
-  if (!button) return;
-  game?.answer(button.dataset.cmd);
-  answerInput.focus();
-});
+$("welcome-start").addEventListener("click", newGame);
 
 readUrl();
 </script>
