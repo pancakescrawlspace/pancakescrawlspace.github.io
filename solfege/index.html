@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>solfege</title>
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --panel: #ffffff;
+    --text: #1d1c1a;
+    --muted: #6d6a63;
+    --line: #dedbd3;
+    --accent: #2f5fb3;
+    --accent-text: #ffffff;
+    --yes: #23753a;
+    --no: #b3372f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614;
+      --panel: #201f1d;
+      --text: #ebe9e4;
+      --muted: #9a968d;
+      --line: #36342f;
+      --accent: #7aa2ec;
+      --accent-text: #10131a;
+      --yes: #6fcf87;
+      --no: #f08a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 44rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; letter-spacing: .02em; }
+  .lede { margin: 0 0 1.25rem; color: var(--muted); }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  summary { cursor: pointer; font-weight: 600; }
+  .fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: .75rem 1rem;
+    margin-top: .75rem;
+  }
+  label { display: block; font-size: .9rem; color: var(--muted); }
+  label.check { display: flex; gap: .5rem; align-items: center; color: var(--text); font-size: 1rem; }
+  input, select, button { font: inherit; color: inherit; }
+  input[type=text], input[type=number], select {
+    display: block;
+    width: 100%;
+    margin-top: .2rem;
+    padding: .4rem .5rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  button {
+    padding: .45rem .9rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .actions { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+  .error { color: var(--no); }
+  #log {
+    font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    min-height: 10rem;
+    max-height: 55vh;
+    overflow-y: auto;
+    margin: 0;
+  }
+  #log .muted { color: var(--muted); }
+  #log .yes { color: var(--yes); }
+  #log .no { color: var(--no); }
+  #log .answer { font-weight: 700; }
+  #answer-form { display: flex; gap: .5rem; align-items: center; margin-top: .75rem; }
+  #prompt { font: 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; color: var(--muted); }
+  #answer { flex: 1; min-width: 0; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .keys { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+  kbd { font: .8em ui-monospace, monospace; color: var(--muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>solfege</h1>
+  <p class="lede">A start note, then another note nearby. Name it, or give the interval from the start note to it.</p>
+
+  <form id="options" class="panel">
+    <details id="options-details" open>
+      <summary>Options</summary>
+      <div class="fields">
+        <label>Start note
+          <input type="text" id="opt-start" value="c4" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </label>
+        <label>Range (semitones, 1–24)
+          <input type="number" id="opt-range" value="12" min="1" max="24">
+        </label>
+        <label>Sound
+          <select id="opt-sound">
+            <option value="piano">Instrument samples</option>
+            <option value="synth">Built-in tone</option>
+          </select>
+        </label>
+        <label>Instrument
+          <select id="opt-program"></select>
+        </label>
+        <label>Seed (optional)
+          <input type="number" id="opt-seed" step="1">
+        </label>
+        <div>
+          <label class="check"><input type="checkbox" id="opt-up"> Only notes above the start note</label>
+          <label class="check"><input type="checkbox" id="opt-chromatic"> All twelve notes</label>
+        </div>
+      </div>
+      <p class="muted" style="color: var(--muted); font-size: .9rem; margin: .75rem 0 0">
+        The start note is any note name (<code>c4</code>, <code>g</code>, <code>fis'</code>, <code>bes,</code>; without an
+        octave, the one from middle C up), or <code>random</code> for a new one every round.
+      </p>
+    </details>
+    <div class="actions">
+      <button type="submit" class="primary" id="start-button">Start</button>
+      <span id="options-error" class="error" role="alert"></span>
+    </div>
+  </form>
+
+  <section id="game" class="panel" hidden>
+    <pre id="log" aria-live="polite"></pre>
+    <form id="answer-form" autocomplete="off">
+      <span id="prompt"></span>
+      <input type="text" id="answer" aria-label="Answer" autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false" enterkeyhint="send">
+    </form>
+    <div class="keys" id="keys">
+      <button type="button" data-cmd="r">Play again <kbd>r</kbd></button>
+      <button type="button" data-cmd="p">Second note <kbd>p</kbd></button>
+      <button type="button" data-cmd="s">Give up <kbd>s</kbd></button>
+      <button type="button" data-cmd="q">Quit <kbd>q</kbd></button>
+      <button type="button" data-cmd="?">Help <kbd>?</kbd></button>
+    </div>
+    <div class="actions" id="again" hidden>
+      <button type="button" class="primary" id="again-button">New game</button>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+const HELP = `Sounds a start note (middle C, unless the options say otherwise),
+then another note nearby, from the major scale of the start note (with
+"All twelve notes", any note).  Name the second note, or the interval
+from the start note to it, to go on to the next one.
+
+Answers
+  notes      c d e f g a b, with accidentals # b / is es (Dutch: fis, bes,
+             es, as, ...) or fixed-do syllables (do re mi fa sol la si/ti).
+             Without an octave any octave counts; add one to be exact:
+             scientific (d4, eb5) or LilyPond absolute (d', bes, c'').
+  intervals  a number counted from the start note: 2 = major second,
+             2- = minor second, 1+ = augmented unison, 4+ = augmented
+             fourth, 5- = diminished fifth, 8 = octave, ...  Perfect
+             intervals (1 4 5 8) take + and - for augmented / diminished;
+             the others take - for minor, -- for diminished and + for
+             augmented.  Optionally prefix + (up) or - (down): -3- = minor
+             third down.  Enharmonic answers count (fis = ges, 4+ = 5-).
+
+Commands while playing
+  Enter / r  play both notes again         p  play only the second note
+  s          show the answer, next note    q  quit
+  ?          this help`;
+
+const MIDDLE_C = 60;
+const PIANO = [21, 108];                   // A0 .. C8
+const RANDOM_STARTS = [53, 67];            // F3 .. G4
+const RATE = 44100;
+const SYNTH_LEVEL = 0.25;      // peak of the built-in tone
+const SAMPLE_LEVEL = 2.5;      // the samples peak near -20 dB; this brings them up to the built-in tone
+const TAIL = 1.0;              // seconds a note sounds on after it is released
+const SAMPLES = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
+
+// General MIDI programs, as the sample set names them.
+const INSTRUMENTS = (
+  "acoustic_grand_piano bright_acoustic_piano electric_grand_piano honkytonk_piano " +
+  "electric_piano_1 electric_piano_2 harpsichord clavinet celesta glockenspiel music_box " +
+  "vibraphone marimba xylophone tubular_bells dulcimer drawbar_organ percussive_organ " +
+  "rock_organ church_organ reed_organ accordion harmonica tango_accordion " +
+  "acoustic_guitar_nylon acoustic_guitar_steel electric_guitar_jazz electric_guitar_clean " +
+  "electric_guitar_muted overdriven_guitar distortion_guitar guitar_harmonics acoustic_bass " +
+  "electric_bass_finger electric_bass_pick fretless_bass slap_bass_1 slap_bass_2 " +
+  "synth_bass_1 synth_bass_2 violin viola cello contrabass tremolo_strings " +
+  "pizzicato_strings orchestral_harp timpani string_ensemble_1 string_ensemble_2 " +
+  "synth_strings_1 synth_strings_2 choir_aahs voice_oohs synth_choir orchestra_hit trumpet " +
+  "trombone tuba muted_trumpet french_horn brass_section synth_brass_1 synth_brass_2 " +
+  "soprano_sax alto_sax tenor_sax baritone_sax oboe english_horn bassoon clarinet piccolo " +
+  "flute recorder pan_flute blown_bottle shakuhachi whistle ocarina lead_1_square " +
+  "lead_2_sawtooth lead_3_calliope lead_4_chiff lead_5_charang lead_6_voice lead_7_fifths " +
+  "lead_8_bass__lead pad_1_new_age pad_2_warm pad_3_polysynth pad_4_choir pad_5_bowed " +
+  "pad_6_metallic pad_7_halo pad_8_sweep fx_1_rain fx_2_soundtrack fx_3_crystal " +
+  "fx_4_atmosphere fx_5_brightness fx_6_goblins fx_7_echoes fx_8_scifi sitar banjo " +
+  "shamisen koto kalimba bagpipe fiddle shanai tinkle_bell agogo steel_drums woodblock " +
+  "taiko_drum melodic_tom synth_drum reverse_cymbal guitar_fret_noise breath_noise " +
+  "seashore bird_tweet telephone_ring helicopter applause gunshot").split(" ");
+
+const range = (lo, hi) => Array.from({length: hi - lo + 1}, (_, i) => lo + i);
+const mod = (a, n) => ((a % n) + n) % n;
+const normalize = text => text.trim().toLowerCase().replaceAll(" ", "");
+
+// --- parsing answers ---------------------------------------------------------
+
+const LETTERS = new Map(Object.entries({c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11}));
+const SYLLABLES = new Map(Object.entries({do: 0, ut: 0, re: 2, mi: 4, fa: 5, sol: 7, so: 7,
+                                          la: 9, si: 11, ti: 11}));
+const ACCIDENTALS = new Map(Object.entries({"": 0, "#": 1, "♯": 1, "##": 2, x: 2, is: 1, isis: 2,
+                                            b: -1, "♭": -1, bb: -2, es: -1, eses: -2}));
+const SHORT_FLATS = new Map(Object.entries({s: -1, ses: -2}));   // Dutch/German as, es, ases, eses
+
+const NOTE_RE = /^(do|ut|re|mi|fa|sol|so|la|si|ti|[a-g])([^\d',-]*)(-?\d+|'*|,*)$/u;
+const INTERVAL_RE = /^([+-]?)(\d+)(\++|-+|)$/;
+
+const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
+
+// Return [pitch class, midi number or null], or null if not a note.
+function parseNote(text) {
+  const m = NOTE_RE.exec(text);
+  if (!m) return null;
+  const [, name, acc] = m;
+  let octave = m[3];
+  const base = SYLLABLES.has(name) ? SYLLABLES.get(name) : LETTERS.get(name);
+  let alter;
+  if (ACCIDENTALS.has(acc)) {
+    alter = ACCIDENTALS.get(acc);
+  } else if ((name === "a" || name === "e") && SHORT_FLATS.has(acc)) {
+    alter = SHORT_FLATS.get(acc);
+  } else {
+    return null;
+  }
+  const pc = mod(base + alter, 12);
+  if (!octave) return [pc, null];
+  if ("',".includes(octave[0])) {           // LilyPond: c = C3, c' = C4
+    octave = 3 + octave.split("'").length - octave.split(",").length;
+  } else {
+    octave = parseInt(octave, 10);
+  }
+  return [pc, 12 * (octave + 1) + base + alter];
+}
+
+// Return [semitones, direction] with direction 1, -1 or null.
+function parseInterval(text) {
+  const m = INTERVAL_RE.exec(text);
+  if (!m) return null;
+  const [, sign, number, mods] = m;
+  const n = parseInt(number, 10);
+  if (n < 1) return null;
+  const degree = (n - 1) % 7, octaves = Math.floor((n - 1) / 7);
+  let semis = MAJOR_SCALE[degree] + 12 * octaves;
+  if (mods.startsWith("+")) {
+    semis += mods.length;
+  } else if (mods) {
+    semis -= mods.length;
+  }
+  if (semis < 0) return null;
+  return [semis, {"+": 1, "-": -1, "": null}[sign]];
+}
+
+// --- naming ------------------------------------------------------------------
+
+const SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const FLATS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const SIMPLE = [[1, ""], [2, "-"], [2, ""], [3, "-"], [3, ""], [4, ""], [4, "+"], [5, ""],
+                [6, "-"], [6, ""], [7, "-"], [7, ""]];
+const ORDINALS = [null, "unison", "second", "third", "fourth", "fifth", "sixth",
+                  "seventh", "octave", "ninth", "tenth", "eleventh", "twelfth",
+                  "thirteenth", "fourteenth", "double octave"];
+
+function noteName(midi) {
+  const octave = Math.floor(midi / 12), pc = midi % 12;
+  const names = [...new Set([SHARPS[pc], FLATS[pc]])];
+  return names.map(n => `${n}${octave - 1}`).join(" / ");
+}
+
+function intervalName(semis) {
+  const octaves = Math.floor(Math.abs(semis) / 12), rest = Math.abs(semis) % 12;
+  let [n, mod] = SIMPLE[rest];
+  n += 7 * octaves;
+  let quality;
+  if ([0, 3, 4].includes((n - 1) % 7)) {
+    quality = mod ? "augmented" : "perfect";
+  } else {
+    quality = mod ? "minor" : "major";
+  }
+  let words = [1, 8, 15].includes(n) ? ORDINALS[n] : `${quality} ${ORDINALS[n]}`;
+  let short = `${n}${mod}`;
+  if (rest === 6) {
+    short += ` = ${n + 1}-`;
+    words += ", tritone";
+  }
+  const direction = semis > 0 ? "up" : "down";
+  return `${short} ${direction} (${words})`;
+}
+
+// --- sound -------------------------------------------------------------------
+
+// A plain piano-ish tone: decaying harmonics, fast decay after release.
+function synth(notes, tail) {
+  const total = Math.max(...notes.map(([, s, d]) => s + d + tail));
+  const buf = new Float32Array(Math.floor(total * RATE) + 1);
+  for (const [pitch, start, dur] of notes) {
+    const f = 440 * 2 ** ((pitch - 69) / 12);
+    const partials = [];
+    for (let k = 1; k <= 8; k++) {
+      if (f * k < RATE / 2.2) {
+        partials.push([2 * Math.PI * f * k * (1 + 0.0004 * k * k) / RATE,
+                       0.6 / k ** 1.3, 1.5 + 0.9 * k]);
+      }
+    }
+    const first = Math.floor(start * RATE);
+    const length = Math.floor((dur + tail) * RATE);
+    for (let i = 0; i < length; i++) {
+      const t = i / RATE;
+      let env = Math.min(1, t * 400);
+      if (t > dur) env *= Math.exp(-(t - dur) * 10);
+      let sum = 0;
+      for (const [w, a, d] of partials) sum += a * Math.exp(-t * d) * Math.sin(w * i);
+      buf[first + i] += env * sum;
+    }
+  }
+  let peak = 1e-9;
+  for (const x of buf) peak = Math.max(peak, Math.abs(x));
+  for (let i = 0; i < buf.length; i++) buf[i] = buf[i] / peak * SYNTH_LEVEL;
+  return buf;
+}
+
+// The sample set names its files with flats: Db4, Bb3, ...
+const sampleName = midi => FLATS[midi % 12] + (Math.floor(midi / 12) - 1);
+
+class Sound {
+  constructor(useSynth, program, onFallback) {
+    this.ctx = new AudioContext();
+    this.useSynth = useSynth;
+    this.program = program;
+    this.onFallback = onFallback;
+    this.samples = new Map();
+    this.rendered = new Map();
+    this.out = null;
+    this.token = 0;
+  }
+
+  sample(pitch) {
+    if (!this.samples.has(pitch)) {
+      const url = `${SAMPLES}${INSTRUMENTS[this.program]}-mp3/${sampleName(pitch)}.mp3`;
+      this.samples.set(pitch, fetch(url).then(r => {
+        if (!r.ok) throw new Error(`${url}: ${r.status}`);
+        return r.arrayBuffer();
+      }).then(data => this.ctx.decodeAudioData(data)));
+    }
+    return this.samples.get(pitch);
+  }
+
+  // Start loading samples in the background, so later rounds play at once.
+  prefetch(pitches) {
+    if (this.useSynth) return;
+    for (const p of pitches) this.sample(p).catch(() => {});
+  }
+
+  synthBuffer(notes) {
+    const key = JSON.stringify(notes);
+    if (!this.rendered.has(key)) {
+      const data = synth(notes, TAIL);
+      const buffer = this.ctx.createBuffer(1, data.length, RATE);
+      buffer.copyToChannel(data, 0);
+      this.rendered.set(key, buffer);
+    }
+    return this.rendered.get(key);
+  }
+
+  async play(notes) {
+    this.stop();
+    const token = this.token;
+    if (this.ctx.state === "suspended") this.ctx.resume();
+    let voices;
+    if (!this.useSynth) {
+      try {
+        const buffers = await Promise.all(notes.map(([p]) => this.sample(p)));
+        voices = notes.map(([, start, dur], i) =>
+          ({buffer: buffers[i], start, end: start + dur, level: SAMPLE_LEVEL}));
+      } catch (e) {
+        console.warn(e);
+        if (token !== this.token) return;
+        this.useSynth = true;
+        this.onFallback();
+      }
+    }
+    if (token !== this.token) return;        // stopped, or something else played meanwhile
+    if (this.useSynth) {
+      voices = [{buffer: this.synthBuffer(notes), start: 0, end: null, level: 1}];
+    }
+    const out = this.ctx.createGain();
+    out.connect(this.ctx.destination);
+    const t0 = this.ctx.currentTime + 0.03;
+    for (const {buffer, start, end, level} of voices) {
+      const src = this.ctx.createBufferSource();
+      const gain = this.ctx.createGain();
+      src.buffer = buffer;
+      gain.gain.value = level;
+      src.connect(gain).connect(out);
+      src.start(t0 + start);
+      if (end !== null) {                    // release, like a note-off
+        gain.gain.setValueAtTime(level, t0 + end);
+        gain.gain.setTargetAtTime(0, t0 + end, 0.1);
+        src.stop(t0 + end + TAIL);
+      }
+    }
+    this.out = out;
+  }
+
+  stop() {
+    this.token++;
+    if (!this.out) return;
+    const out = this.out;
+    out.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
+    setTimeout(() => out.disconnect(), 100);
+    this.out = null;
+  }
+}
+
+// --- the exercise ------------------------------------------------------------
+
+// Return the midi number of a start note (in the octave from middle C up if
+// none is given), null for "random", or undefined if it is neither.
+function parseStart(text) {
+  text = normalize(text);
+  if (text === "random") return null;
+  let note = parseNote(text);
+  if (note && note[1] === null) note = parseNote(text + "4");
+  return note ? note[1] : undefined;
+}
+
+// Return [correct, remark].
+function check(answer, target, start) {
+  const dist = target - start;
+  const iv = parseInterval(answer);
+  if (iv !== null) {
+    const [semis, direction] = iv;
+    if (semis !== Math.abs(dist)) return [false, null];
+    if (direction !== null && direction !== (dist > 0 ? 1 : -1)) {
+      return [false, "right size, wrong direction"];
+    }
+    return [true, null];
+  }
+  const note = parseNote(answer);
+  if (note !== null) {
+    const [pc, midi] = note;
+    if (pc !== target % 12) return [false, null];
+    if (midi !== null && midi !== target) return [false, "right note, wrong octave"];
+    return [true, null];
+  }
+  return [false, "not a note or an interval (? for help)"];
+}
+
+// mulberry32: a small seeded generator, for the seed option.
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// A white key from F3 to G4 (with chromatic, any key).
+function startChoices(opts) {
+  return range(...RANDOM_STARTS).filter(n => opts.chromatic || MAJOR_SCALE.includes(n % 12));
+}
+
+// Notes near the start note, from its major scale unless chromatic.
+function candidates(opts, start) {
+  return range(-opts.range, opts.range).filter(d =>
+    d && !(opts.up && d < 0)
+    && (opts.chromatic || MAJOR_SCALE.includes(mod(d, 12)))
+    && start + d >= PIANO[0] && start + d <= PIANO[1]).map(d => start + d);
+}
+
+class Game {
+  constructor(opts, sound) {
+    this.opts = opts;
+    this.sound = sound;
+    this.random = opts.seed === null ? Math.random : seeded(opts.seed);
+    this.randomStart = opts.start === null;
+    this.start = opts.start;
+    this.target = null;
+    this.rounds = this.firstTime = this.later = this.givenUp = 0;
+    this.over = false;
+    this.waiting = false;
+  }
+
+  choice(list) {
+    return list[Math.floor(this.random() * list.length)];
+  }
+
+  begin() {
+    let first;
+    if (this.randomStart) {
+      first = "A start note (a new one every round)";
+    } else if (this.start === MIDDLE_C) {
+      first = "Middle C";
+    } else {
+      first = noteName(this.start);
+    }
+    print(`${first}, then another note: name it or give the interval (? for help, q to quit).`);
+    const playing = this.nextRound();
+    const starts = this.randomStart ? startChoices(this.opts) : [this.start];
+    const pitches = new Set(starts.flatMap(s => [s, ...candidates(this.opts, s)]));
+    playing?.then(() => this.sound.prefetch(pitches));
+  }
+
+  nextRound() {
+    this.waiting = false;
+    if (this.randomStart) this.start = this.choice(startChoices(this.opts));
+    const choices = candidates(this.opts, this.start);
+    if (choices.length > 1 && choices.includes(this.target)) {
+      choices.splice(choices.indexOf(this.target), 1);
+    }
+    if (!choices.length) {
+      print("solfege: no notes to choose from; widen the range"
+            + (this.opts.chromatic ? "" : " or choose all twelve notes"), "no");
+      this.end(false);
+      return null;
+    }
+    this.target = this.choice(choices);
+    this.rounds++;
+    this.tries = 0;
+    this.both = [[this.start, 0.0, 1.0], [this.target, 1.2, 1.4]];
+    setPrompt(this.randomStart ? `[${this.rounds}] from ${noteName(this.start)} ? `
+                               : `[${this.rounds}] ? `);
+    return this.sound.play(this.both);
+  }
+
+  answer(raw) {
+    if (this.over || this.waiting) return;
+    const answer = normalize(raw);
+    print([[promptText(), "muted"], [raw, "answer"]]);
+    if (answer === "" || answer === "r") {
+      this.sound.play(this.both);
+    } else if (answer === "p") {
+      this.sound.play([[this.target, 0.0, 1.4]]);
+    } else if (answer === "?" || answer === "help") {
+      print(HELP, "muted");
+    } else if (["q", "quit", "exit"].includes(answer)) {
+      this.end(true);
+    } else if (answer === "s") {
+      this.givenUp++;
+      print(`  It was ${noteName(this.target)}: ${intervalName(this.target - this.start)}.`);
+      this.pause();
+    } else {
+      this.tries++;
+      const [ok, remark] = check(answer, this.target, this.start);
+      if (ok) {
+        if (this.tries === 1) this.firstTime++; else this.later++;
+        print(`  Yes: ${noteName(this.target)}, ${intervalName(this.target - this.start)}.`, "yes");
+        this.pause();
+      } else {
+        print(`  No${remark ? ", " + remark : ""}.`, "no");
+      }
+    }
+  }
+
+  pause() {
+    this.waiting = true;
+    setPrompt("");
+    setTimeout(() => { if (!this.over) this.nextRound(); }, 600);
+  }
+
+  end(showScore) {
+    if (this.over) return;
+    this.over = true;
+    this.sound.stop();
+    setPrompt("");
+    if (showScore) {
+      const done = this.firstTime + this.later + this.givenUp;
+      if (this.target !== null && done < this.rounds) {
+        print(`It was ${noteName(this.target)}: ${intervalName(this.target - this.start)}.`);
+      }
+      if (done) {
+        print(`${done} note${done !== 1 ? "s" : ""}: ${this.firstTime} right first time, `
+              + `${this.later} after more tries, ${this.givenUp} given up.`);
+      }
+    }
+    gameOver();
+  }
+}
+
+// --- the page ----------------------------------------------------------------
+
+const $ = id => document.getElementById(id);
+const log = $("log"), answerInput = $("answer");
+let game = null, sound = null;
+
+// Print a line: a string, or a list of [text, class] parts.
+function print(line, cls) {
+  const div = document.createElement("div");
+  for (const [text, c] of typeof line === "string" ? [[line, cls]] : line) {
+    const span = document.createElement("span");
+    span.textContent = text;
+    if (c) span.className = c;
+    div.append(span);
+  }
+  log.append(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+const promptText = () => $("prompt").textContent;
+const setPrompt = text => { $("prompt").textContent = text; };
+
+function gameOver() {
+  answerInput.disabled = true;
+  for (const b of $("keys").querySelectorAll("button")) b.disabled = true;
+  $("again").hidden = false;
+  $("again-button").focus();
+}
+
+for (const [i, name] of INSTRUMENTS.entries()) {
+  const label = name.replace("__", " + ").replaceAll("_", " ");
+  $("opt-program").add(new Option(`${i} ${label}`, i));
+}
+
+const syncSound = () => { $("opt-program").disabled = $("opt-sound").value === "synth"; };
+$("opt-sound").addEventListener("change", syncSound);
+
+// The options can come from the URL, named like the command-line options:
+// ?start=g&range=7&up&chromatic&synth&program=40&seed=1
+function readUrl() {
+  const q = new URLSearchParams(location.search);
+  if (q.has("start")) $("opt-start").value = q.get("start");
+  if (q.has("range")) $("opt-range").value = q.get("range");
+  if (q.has("program")) $("opt-program").value = q.get("program");
+  if (q.has("seed")) $("opt-seed").value = q.get("seed");
+  $("opt-up").checked = q.has("up");
+  $("opt-chromatic").checked = q.has("chromatic");
+  $("opt-sound").value = q.has("synth") ? "synth" : "piano";
+  syncSound();
+}
+
+function writeUrl(opts) {
+  const q = new URLSearchParams();
+  if (normalize($("opt-start").value) !== "c4") q.set("start", $("opt-start").value.trim());
+  if (opts.range !== 12) q.set("range", opts.range);
+  if (opts.up) q.set("up", "");
+  if (opts.chromatic) q.set("chromatic", "");
+  if (opts.synth) q.set("synth", "");
+  else if (opts.program !== 0) q.set("program", opts.program);
+  if (opts.seed !== null) q.set("seed", opts.seed);
+  const search = q.toString().replace(/=(?=&|$)/g, "");
+  history.replaceState(null, "", search ? `?${search}` : location.pathname);
+}
+
+function readOptions() {
+  const start = parseStart($("opt-start").value);
+  if (start === undefined) throw new Error("The start note is not a note or “random”.");
+  if (start !== null && (start < PIANO[0] || start > PIANO[1])) {
+    throw new Error("The start note must be between A0 and C8.");
+  }
+  const rangeValue = Number($("opt-range").value);
+  if (!Number.isInteger(rangeValue) || rangeValue < 1 || rangeValue > 24) {
+    throw new Error("The range must be between 1 and 24.");
+  }
+  const seedText = $("opt-seed").value.trim();
+  if (seedText && !Number.isInteger(Number(seedText))) throw new Error("The seed must be a whole number.");
+  return {
+    start,
+    range: rangeValue,
+    up: $("opt-up").checked,
+    chromatic: $("opt-chromatic").checked,
+    synth: $("opt-sound").value === "synth",
+    program: Number($("opt-program").value),
+    seed: seedText ? Number(seedText) : null,
+  };
+}
+
+function newGame() {
+  let opts;
+  try {
+    opts = readOptions();
+  } catch (e) {
+    $("options-error").textContent = e.message;
+    $("options-details").open = true;
+    return;
+  }
+  $("options-error").textContent = "";
+  writeUrl(opts);
+  game?.end(false);
+  sound?.stop();
+  sound?.ctx.close();
+  sound = new Sound(opts.synth, opts.program,
+                    () => print("(the samples couldn't be loaded; using the built-in tone)", "muted"));
+  log.textContent = "";
+  answerInput.disabled = false;
+  for (const b of $("keys").querySelectorAll("button")) b.disabled = false;
+  $("again").hidden = true;
+  $("game").hidden = false;
+  $("options-details").open = false;
+  $("start-button").textContent = "Restart";
+  game = new Game(opts, sound);
+  game.begin();
+  answerInput.focus();
+}
+
+$("options").addEventListener("submit", e => { e.preventDefault(); newGame(); });
+$("again-button").addEventListener("click", newGame);
+
+$("answer-form").addEventListener("submit", e => {
+  e.preventDefault();
+  game?.answer(answerInput.value);
+  answerInput.value = "";
+});
+
+$("keys").addEventListener("click", e => {
+  const button = e.target.closest("button[data-cmd]");
+  if (!button) return;
+  game?.answer(button.dataset.cmd);
+  answerInput.focus();
+});
+
+readUrl();
+</script>
+</body>
+</html>
