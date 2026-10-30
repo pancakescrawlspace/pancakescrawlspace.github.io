@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>piano</title>
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --panel: #ffffff;
+    --text: #1d1c1a;
+    --muted: #6d6a63;
+    --line: #dedbd3;
+    --accent: #2f5fb3;
+    --accent-soft: #c9d8f3;
+    --accent-text: #ffffff;
+    --no: #b3372f;
+    --key-white: #fdfdfb;
+    --key-black: #2a2926;
+    --key-line: #b9b5ab;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614;
+      --panel: #201f1d;
+      --text: #ebe9e4;
+      --muted: #9a968d;
+      --line: #36342f;
+      --accent: #7aa2ec;
+      --accent-soft: #a9c1ef;
+      --accent-text: #10131a;
+      --no: #f08a80;
+      --key-white: #e9e7e1;
+      --key-black: #0d0d0c;
+      --key-line: #4a4741;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 72rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  h1 { font-size: 1.6rem; margin: 0; letter-spacing: .02em; }
+  a { color: var(--accent); }
+  .lede { margin: .25rem 0 1.25rem; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .small { font-size: .9rem; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  input, button { font: inherit; color: inherit; }
+  button {
+    padding: .5rem .95rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  kbd {
+    font: .75em ui-monospace, monospace;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0 .3em;
+    margin-left: .35em;
+  }
+  p kbd { margin-left: 0; }
+  button.primary kbd { color: inherit; border-color: currentColor; opacity: .7; }
+
+  /* recording */
+  .toolbar { display: flex; gap: .5rem 1rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .toolbar .buttons { display: flex; gap: .5rem; }
+  #status { flex: 1; min-width: 10rem; }
+  .dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; background: var(--no); margin-right: .45rem; }
+  #record.recording { border-color: var(--no); color: var(--no); font-weight: 600; }
+  #record.recording .dot { animation: blink 1s steps(2, jump-none) infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .settings { display: flex; gap: .5rem 1rem; flex-wrap: wrap; }
+  .setting { font-size: .9rem; color: var(--muted); display: flex; gap: .5rem; align-items: center; }
+  .setting input, .setting select {
+    font-size: 1rem; padding: .35rem .5rem;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  }
+  .setting input { width: 4rem; }
+
+  /* the keyboard */
+  .keyboard-scroll { overflow-x: auto; padding-bottom: .25rem; }
+  .keyboard {
+    --key-min: 1.4rem;
+    position: relative; display: flex; height: 12rem; user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    min-width: calc(var(--whites) * var(--key-min));
+  }
+  @media (max-width: 34rem) {
+    .keyboard { --key-min: 1.6rem; height: 10rem; }
+    .key.white { font-size: .6rem; }
+  }
+  @media (hover: none) {
+    kbd, .hint, .shortcut { display: none; }
+  }
+  /* From the bottom up: the letter key that plays it, the name of a C, the dot on middle C. */
+  .key {
+    padding: 0 0 .4rem; border-radius: 0 0 6px 6px; touch-action: manipulation;
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+  }
+  .key.white {
+    flex: 1; min-width: var(--key-min);
+    background: var(--key-white); border: 1px solid var(--key-line); margin-right: -1px;
+    color: #55524b; font-size: .72rem;
+  }
+  .key.black {
+    position: absolute; top: 0; height: 60%; z-index: 1;
+    background: var(--key-black); border: 1px solid var(--key-black);
+    color: #b9b5ab; font-size: .65rem;
+  }
+  .shortcut { height: 1.2em; line-height: 1.2; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .key.white .shortcut { color: #8a867d; }
+  .key .name { margin-bottom: .3rem; }
+  .key:hover { filter: brightness(.94); }
+  .key.black:hover { filter: brightness(1.6); }
+  .key.white.down { background: var(--accent-soft); filter: none; }
+  .key.black.down { background: var(--accent); border-color: var(--accent); filter: none; }
+  .key.middle::before {
+    content: ""; width: .55rem; height: .55rem; border-radius: 50%;
+    background: var(--accent); margin-bottom: .3rem;
+  }
+  .hint { margin: .75rem 0 0; }
+  #notice { margin: .5rem 0 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>piano</h1>
+    <!-- A hard-coded relative path to the solfege page, right for this repo (piano/ next to web/).
+         Where the pages are deployed elsewhere, such as the github.io site with the solfege page in
+         solfege/, change it to match (with piano/ next to solfege/ there: ../solfege/). -->
+    <a href="../solfege/" class="small">solfege</a>
+  </header>
+  <p class="lede">Play the keys, or record a run of notes and play it back.</p>
+
+  <section class="panel">
+    <div class="toolbar">
+      <div class="buttons">
+        <button type="button" id="record"><span class="dot"></span><span class="label">Record</span> <kbd>Enter</kbd></button>
+        <button type="button" class="primary" id="play" disabled><span class="label">Play</span> <kbd>Space</kbd></button>
+      </div>
+      <span id="status" class="muted small" role="status" aria-live="polite"></span>
+      <div class="settings">
+        <label class="setting">Release
+          <select id="release">
+            <option value="0.1">Short, 0.1 s</option>
+            <option value="0.3" selected>Medium, 0.3 s</option>
+            <option value="1">Long, 1 s</option>
+          </select>
+        </label>
+        <label class="setting">Octaves
+          <input type="number" id="octaves" value="4" min="1" max="7">
+        </label>
+      </div>
+    </div>
+    <div class="keyboard-scroll"><div class="keyboard" id="keyboard"></div></div>
+    <p class="hint muted small">The letters on the keys are the computer keys that play them. <kbd>↓</kbd> and
+      <kbd>↑</kbd> move them an octave down or up.</p>
+    <p id="notice" class="muted small" hidden></p>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+const MIDDLE_C = 60;
+const PIANO = [21, 108];                   // A0 .. C8
+const MAX_OCTAVES = 7;                     // C1 .. C8
+const RATE = 44100;
+const SYNTH_LEVEL = 0.25;      // peak of the built-in tone
+const SAMPLE_LEVEL = 2.5;      // the samples peak near -20 dB; this brings them up to the built-in tone
+const HOLD = 3.0;              // seconds the built-in tone lasts while a key is held
+const TAIL = 1.0;              // seconds the built-in tone fades out over after HOLD
+const RELEASES = [0.1, 0.3, 1];  // how fast a note fades once its key is let go: the time it takes to drop to 37%
+const RELEASE = 0.3;
+const SAMPLES = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3/";
+
+const range = (lo, hi) => Array.from({length: hi - lo + 1}, (_, i) => lo + i);
+
+const SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const FLATS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+
+function noteName(midi) {
+  const octave = Math.floor(midi / 12), pc = midi % 12;
+  const names = [...new Set([SHARPS[pc], FLATS[pc]])];
+  return names.map(n => `${n}${octave - 1}`).join(" / ");
+}
+
+// --- sound -------------------------------------------------------------------
+
+// A plain piano-ish tone: decaying harmonics, fast decay after release.
+function synth(notes, tail) {
+  const total = Math.max(...notes.map(([, s, d]) => s + d + tail));
+  const buf = new Float32Array(Math.floor(total * RATE) + 1);
+  for (const [pitch, start, dur] of notes) {
+    const f = 440 * 2 ** ((pitch - 69) / 12);
+    const partials = [];
+    for (let k = 1; k <= 8; k++) {
+      if (f * k < RATE / 2.2) {
+        partials.push([2 * Math.PI * f * k * (1 + 0.0004 * k * k) / RATE,
+                       0.6 / k ** 1.3, 1.5 + 0.9 * k]);
+      }
+    }
+    const first = Math.floor(start * RATE);
+    const length = Math.floor((dur + tail) * RATE);
+    for (let i = 0; i < length; i++) {
+      const t = i / RATE;
+      let env = Math.min(1, t * 400);
+      if (t > dur) env *= Math.exp(-(t - dur) * 10);
+      let sum = 0;
+      for (const [w, a, d] of partials) sum += a * Math.exp(-t * d) * Math.sin(w * i);
+      buf[first + i] += env * sum;
+    }
+  }
+  let peak = 1e-9;
+  for (const x of buf) peak = Math.max(peak, Math.abs(x));
+  for (let i = 0; i < buf.length; i++) buf[i] = buf[i] / peak * SYNTH_LEVEL;
+  return buf;
+}
+
+// The sample set names its files with flats: Db4, Bb3, ...
+const sampleName = midi => FLATS[midi % 12] + (Math.floor(midi / 12) - 1);
+
+// Notes that start when a key goes down and fade when it comes up: the piano
+// samples, or the built-in tone if they can't be loaded.
+class Sound {
+  constructor(onFallback) {
+    this.ctx = new AudioContext();
+    this.useSynth = false;
+    this.release = RELEASE;
+    this.onFallback = onFallback;
+    this.samples = new Map();
+    this.rendered = new Map();
+  }
+
+  sample(pitch) {
+    if (!this.samples.has(pitch)) {
+      const url = `${SAMPLES}${sampleName(pitch)}.mp3`;
+      this.samples.set(pitch, fetch(url).then(r => {
+        if (!r.ok) throw new Error(`${url}: ${r.status}`);
+        return r.arrayBuffer();
+      }).then(data => this.ctx.decodeAudioData(data)));
+    }
+    return this.samples.get(pitch);
+  }
+
+  // Start loading samples in the background, so the keys play at once.
+  prefetch(pitches) {
+    if (this.useSynth) return;
+    for (const p of pitches) this.sample(p).catch(() => {});
+  }
+
+  synthBuffer(pitch) {
+    if (!this.rendered.has(pitch)) {
+      const data = synth([[pitch, 0, HOLD]], TAIL);
+      const buffer = this.ctx.createBuffer(1, data.length, RATE);
+      buffer.copyToChannel(data, 0);
+      this.rendered.set(pitch, buffer);
+    }
+    return this.rendered.get(pitch);
+  }
+
+  // A promise of [buffer, level] for a note.
+  voice(pitch) {
+    if (this.useSynth) return Promise.resolve([this.synthBuffer(pitch), 1]);
+    return this.sample(pitch).then(buffer => [buffer, SAMPLE_LEVEL], e => {
+      console.warn(e);
+      if (!this.useSynth) {
+        this.useSynth = true;
+        this.onFallback();
+      }
+      return [this.synthBuffer(pitch), 1];
+    });
+  }
+
+  // Start a note; return a function that lets it go. A note let go before its
+  // sample has loaded still sounds, briefly.
+  start(pitch) {
+    if (this.ctx.state === "suspended") this.ctx.resume();
+    const gain = this.ctx.createGain();
+    gain.connect(this.ctx.destination);
+    let src = null, released = false;
+    const fade = () => {
+      const t = this.ctx.currentTime;
+      gain.gain.setTargetAtTime(0, t, this.release);
+      src.stop(t + 5 * this.release);          // by then it is below 1%
+    };
+    this.voice(pitch).then(([buffer, level]) => {
+      src = this.ctx.createBufferSource();
+      src.buffer = buffer;
+      src.onended = () => gain.disconnect();
+      gain.gain.value = level;
+      src.connect(gain);
+      src.start();
+      if (released) fade();
+    });
+    return () => {
+      if (released) return;
+      released = true;
+      if (src) fade();
+    };
+  }
+}
+
+// --- notes and the recording -------------------------------------------------
+
+const $ = id => document.getElementById(id);
+const isBlack = midi => [1, 3, 6, 8, 10].includes(midi % 12);
+const keyFor = pitch => $("keyboard").querySelector(`[data-pitch="${pitch}"]`);
+
+const sound = new Sound(() => {
+  $("notice").textContent = "The piano samples couldn't be loaded, so this uses the built-in tone.";
+  $("notice").hidden = false;
+});
+
+const sounding = new Map();      // pitch -> the function that lets it go
+
+// Play a note until release(). by is "you" or "playback"; only yours are recorded.
+function press(pitch, by = "you") {
+  sounding.get(pitch)?.();
+  sounding.set(pitch, sound.start(pitch));
+  keyFor(pitch)?.classList.add("down");
+  if (by === "you") recorder.note(pitch, true);
+}
+
+function release(pitch, by = "you") {
+  const letGo = sounding.get(pitch);
+  if (!letGo) return;
+  letGo();
+  sounding.delete(pitch);
+  keyFor(pitch)?.classList.remove("down");
+  if (by === "you") recorder.note(pitch, false);
+}
+
+// The one recorded run, as [seconds from its first note, pitch, down]. A new
+// recording replaces it from its first note on, so recording nothing keeps it.
+const recorder = {
+  run: [],
+  recording: false,
+  t0: null,                // when the new run's first note came
+  playing: false,
+  timers: [],
+  held: new Set(),         // the notes playback has down
+
+  note(pitch, down) {
+    if (!this.recording) return;
+    const now = performance.now() / 1000;
+    if (this.t0 === null) {
+      if (!down) return;
+      this.t0 = now;
+      this.run = [];
+    }
+    this.run.push([now - this.t0, pitch, down]);
+    renderRecorder();
+  },
+
+  record() {
+    this.stop();
+    this.recording = true;
+    this.t0 = null;
+    renderRecorder();
+  },
+
+  // Stop recording or playing back.
+  stop() {
+    if (this.recording) {
+      this.recording = false;
+      // Notes still held end here.
+      if (this.t0 !== null) {
+        const now = performance.now() / 1000 - this.t0;
+        for (const pitch of sounding.keys()) this.run.push([now, pitch, false]);
+      }
+    }
+    if (this.playing) {
+      this.playing = false;
+      for (const timer of this.timers) clearTimeout(timer);
+      this.timers = [];
+      for (const pitch of this.held) release(pitch, "playback");
+      this.held.clear();
+    }
+    renderRecorder();
+  },
+
+  play() {
+    this.stop();
+    if (!this.run.length) return;
+    this.playing = true;
+    for (const [t, pitch, down] of this.run) {
+      this.timers.push(setTimeout(() => {
+        if (down) {
+          press(pitch, "playback");
+          this.held.add(pitch);
+        } else if (this.held.delete(pitch)) {
+          release(pitch, "playback");
+        }
+      }, t * 1000));
+    }
+    this.timers.push(setTimeout(() => this.stop(), this.run.at(-1)[0] * 1000 + 50));
+    renderRecorder();
+  },
+};
+
+function renderRecorder() {
+  const r = recorder;
+  const notes = r.run.filter(([, , down]) => down).length;
+  const length = r.run.length ? r.run.at(-1)[0] : 0;
+  const summary = `${notes} note${notes === 1 ? "" : "s"}, ${length.toFixed(1)} s`;
+  $("status").textContent =
+      r.recording ? (r.t0 === null ? "Recording: it starts at the first note." : `Recording… ${notes} so far`)
+    : r.playing ? `Playing ${summary}`
+    : notes ? `Recorded: ${summary}`
+    : "Nothing recorded yet.";
+  $("record").classList.toggle("recording", r.recording);
+  $("record").querySelector(".label").textContent = r.recording ? "Stop" : "Record";
+  $("play").querySelector(".label").textContent = r.playing ? "Stop" : "Play";
+  $("play").disabled = !r.playing && !r.run.length;
+}
+
+// --- the keyboard ------------------------------------------------------------
+
+// C to C, with middle C in the middle (or just right of it, for an odd number).
+function keyRange(octaves) {
+  const lo = MIDDLE_C - 12 * Math.floor(octaves / 2);
+  return [lo, lo + 12 * octaves];
+}
+
+function renderKeyboard(octaves) {
+  const [lo, hi] = keyRange(octaves);
+  const whites = range(lo, hi).filter(n => !isBlack(n));
+  const width = 100 / whites.length;
+  const keyboard = $("keyboard");
+  keyboard.replaceChildren();
+  keyboard.style.setProperty("--whites", whites.length);
+  for (const pitch of range(lo, hi)) {
+    const key = document.createElement("button");
+    key.type = "button";
+    key.className = "key " + (isBlack(pitch) ? "black" : "white");
+    key.dataset.pitch = pitch;
+    key.setAttribute("aria-label", noteName(pitch) + (pitch === MIDDLE_C ? ", middle C" : ""));
+    if (pitch === MIDDLE_C) key.classList.add("middle");
+    if (sounding.has(pitch)) key.classList.add("down");
+    if (isBlack(pitch)) {
+      const left = whites.filter(n => n < pitch).length * width;
+      key.style.left = `calc(${left}% - ${width * 0.31}%)`;
+      key.style.width = `${width * 0.62}%`;
+    } else if (pitch % 12 === 0) {
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = noteName(pitch);
+      key.append(name);
+    }
+    // Always there, empty or not, so the names of the Cs all sit at one height.
+    const shortcut = document.createElement("span");
+    shortcut.className = "shortcut";
+    shortcut.setAttribute("aria-hidden", "true");
+    key.append(shortcut);
+    keyboard.append(key);
+  }
+  renderShortcuts();
+  // When the keys don't all fit, start with middle C in the middle.
+  const scroller = keyboard.parentElement, middle = keyboard.querySelector(".middle");
+  scroller.scrollLeft = middle.offsetLeft + middle.offsetWidth / 2 - scroller.clientWidth / 2;
+  sound.prefetch(range(lo, hi));
+}
+
+// Mouse, pen and touch: each pointer holds one key. A mouse can slide across
+// the keys; a finger stays on the key it went down on.
+const pointers = new Map();      // pointerId -> pitch
+
+$("keyboard").addEventListener("pointerdown", e => {
+  const key = e.target.closest(".key");
+  if (!key || e.button !== 0) return;
+  e.preventDefault();            // no focus, so Space and Enter don't press the key afterwards
+  const pitch = Number(key.dataset.pitch);
+  pointers.set(e.pointerId, pitch);
+  press(pitch);
+});
+
+$("keyboard").addEventListener("pointerover", e => {
+  const key = e.target.closest(".key");
+  if (!key || !pointers.has(e.pointerId)) return;
+  const pitch = Number(key.dataset.pitch);
+  if (pitch === pointers.get(e.pointerId)) return;
+  release(pointers.get(e.pointerId));
+  pointers.set(e.pointerId, pitch);
+  press(pitch);
+});
+
+for (const type of ["pointerup", "pointercancel"]) {
+  window.addEventListener(type, e => {
+    if (!pointers.has(e.pointerId)) return;
+    release(pointers.get(e.pointerId));
+    pointers.delete(e.pointerId);
+  });
+}
+
+$("keyboard").addEventListener("contextmenu", e => e.preventDefault());
+
+// A key chosen with Tab and pressed with Space or Enter plays a short note.
+$("keyboard").addEventListener("click", e => {
+  const key = e.target.closest(".key");
+  if (!key || e.detail !== 0) return;
+  const pitch = Number(key.dataset.pitch);
+  press(pitch);
+  setTimeout(() => release(pitch), 400);
+});
+
+// The computer keyboard, in two halves as on many music programs: the bottom
+// row from Z plays the white keys of the octave below middle C, the row above
+// it the black keys; the row from Q plays the white keys from middle C up to
+// G5, the number row above it the black keys.
+const LETTER_KEYS = [
+  "KeyZ", "KeyS", "KeyX", "KeyD", "KeyC", "KeyV", "KeyG", "KeyB", "KeyH", "KeyN", "KeyJ", "KeyM",
+  "KeyQ", "Digit2", "KeyW", "Digit3", "KeyE", "KeyR", "Digit5", "KeyT", "Digit6", "KeyY", "Digit7", "KeyU",
+  "KeyI", "Digit9", "KeyO", "Digit0", "KeyP", "BracketLeft", "Equal", "BracketRight"];
+const OCTAVE_SHIFT = [-2, 2];    // keeps the letter keys on the piano
+let shift = 0;
+const typed = new Map();         // key code -> the pitch it plays, so a shift while held still lets go
+
+const letterPitch = i => MIDDLE_C - 12 + 12 * shift + i;
+
+// What the letter keys say on them: as on a US keyboard, or as on your own
+// where the browser can tell (so an AZERTY keyboard shows A where this shows Q).
+let letterLabels = LETTER_KEYS.map(code =>
+  ({BracketLeft: "[", Equal: "=", BracketRight: "]"})[code] ?? code.replace(/^(Key|Digit)/, ""));
+navigator.keyboard?.getLayoutMap?.().then(layout => {
+  letterLabels = LETTER_KEYS.map((code, i) => layout.get(code)?.toUpperCase() ?? letterLabels[i]);
+  renderShortcuts();
+}).catch(() => {});
+
+// Put the letters on the keys they play.
+function renderShortcuts() {
+  for (const el of $("keyboard").querySelectorAll(".shortcut")) el.textContent = "";
+  for (const [i, label] of letterLabels.entries()) {
+    const key = keyFor(letterPitch(i));
+    if (key) key.querySelector(".shortcut").textContent = label;
+  }
+}
+
+document.addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const target = e.target instanceof Element ? e.target : document.body;
+  if (target.closest("input, select")) return;
+  // Space and Enter press a button or key that has the focus.
+  if ((e.code === "Space" || e.code === "Enter") && target.closest("button")) return;
+  const i = LETTER_KEYS.indexOf(e.code);
+  if (i >= 0) {
+    if (!e.repeat && !typed.has(e.code)) {
+      typed.set(e.code, letterPitch(i));
+      press(letterPitch(i));
+    }
+  } else if (e.code === "ArrowDown" || e.code === "ArrowUp") {
+    shift = Math.min(OCTAVE_SHIFT[1], Math.max(OCTAVE_SHIFT[0], shift + (e.code === "ArrowUp" ? 1 : -1)));
+    renderShortcuts();
+  } else if (e.code === "Enter") {
+    if (!e.repeat) recorder.recording ? recorder.stop() : recorder.record();
+  } else if (e.code === "Space") {
+    if (!e.repeat) recorder.playing ? recorder.stop() : recorder.play();
+  } else {
+    return;
+  }
+  e.preventDefault();
+});
+
+document.addEventListener("keyup", e => {
+  if (!typed.has(e.code)) return;
+  release(typed.get(e.code));
+  typed.delete(e.code);
+});
+
+// Keys let go while the page wasn't looking never send a keyup.
+window.addEventListener("blur", () => {
+  for (const pitch of typed.values()) release(pitch);
+  typed.clear();
+});
+
+// --- buttons and settings ----------------------------------------------------
+
+$("record").addEventListener("click", () => recorder.recording ? recorder.stop() : recorder.record());
+$("play").addEventListener("click", () => recorder.playing ? recorder.stop() : recorder.play());
+
+function readOctaves() {
+  const n = Number($("octaves").value);
+  return Number.isInteger(n) ? Math.min(MAX_OCTAVES, Math.max(1, n)) : 4;
+}
+
+function readRelease() {
+  const r = Number($("release").value);
+  return RELEASES.includes(r) ? r : RELEASE;
+}
+
+// The settings can also go in the URL: index.html?octaves=6&release=1
+function writeUrl() {
+  const q = new URLSearchParams();
+  if (readOctaves() !== 4) q.set("octaves", readOctaves());
+  if (readRelease() !== RELEASE) q.set("release", readRelease());
+  const search = q.toString();
+  history.replaceState(null, "", search ? `?${search}` : location.pathname);
+}
+
+$("octaves").addEventListener("change", () => {
+  $("octaves").value = readOctaves();
+  writeUrl();
+  renderKeyboard(readOctaves());
+});
+
+$("release").addEventListener("change", () => {
+  sound.release = readRelease();
+  writeUrl();
+});
+
+const fromUrl = new URLSearchParams(location.search);
+if (fromUrl.has("octaves")) $("octaves").value = fromUrl.get("octaves");
+if (fromUrl.has("release")) $("release").value = fromUrl.get("release");
+$("octaves").value = readOctaves();
+$("release").value = sound.release = readRelease();
+renderKeyboard(readOctaves());
+renderRecorder();
+</script>
+</body>
+</html>
