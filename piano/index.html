@@ -109,7 +109,7 @@
   @media (hover: none) {
     kbd, .hint, .shortcut { display: none; }
   }
-  /* From the bottom up: the letter key that plays it, the name of a C, the dot on middle C. */
+  /* From the bottom up: the letter key that plays it, the name of a C (middle C's in blue). */
   .key {
     padding: 0 0 .4rem; border-radius: 0 0 6px 6px; touch-action: manipulation;
     display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
@@ -131,10 +131,7 @@
   .key.black:hover { filter: brightness(1.6); }
   .key.white.down { background: var(--accent-soft); filter: none; }
   .key.black.down { background: var(--accent); border-color: var(--accent); filter: none; }
-  .key.middle::before {
-    content: ""; width: .55rem; height: .55rem; border-radius: 50%;
-    background: var(--accent); margin-bottom: .3rem;
-  }
+  .key.middle .name { color: #2f5fb3; font-weight: 700; }   /* the white keys are light in both themes */
   .hint { margin: .75rem 0 0; }
   #notice { margin: .5rem 0 0; }
   [hidden] { display: none !important; }
