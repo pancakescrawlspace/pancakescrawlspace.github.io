@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed, with the notes inside the middle 80% that every system's mask keeps. -->
+  <rect width="512" height="512" fill="#2f5fb3"/>
+  <g transform="translate(256 256) scale(.8) translate(-256 -256)">
+    <g fill="#fdfdfb" transform="translate(-10 9)">
+      <ellipse cx="196" cy="352" rx="60" ry="44" transform="rotate(-22 196 352)"/>
+      <ellipse cx="336" cy="300" rx="60" ry="44" transform="rotate(-22 336 300)"/>
+      <rect x="238" y="160" width="18" height="190"/>
+      <rect x="378" y="108" width="18" height="190"/>
+      <polygon points="238,150 396,98 396,146 238,198"/>
+    </g>
+  </g>
+</svg>
