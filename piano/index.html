@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>piano</title>
+<!-- Installing it as an app, and the icons; sw.js keeps it for offline use. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#f7f6f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
 <style>
   :root {
     --bg: #f7f6f2;
@@ -631,6 +637,12 @@ $("octaves").value = readOctaves();
 $("release").value = sound.release = readRelease();
 renderKeyboard(readOctaves());
 renderRecorder();
+
+// Keep the page and the samples for offline use, which also lets browsers
+// install it as an app. This needs https or localhost, not a file.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(e => console.warn(e));
+}
 </script>
 </body>
 </html>
