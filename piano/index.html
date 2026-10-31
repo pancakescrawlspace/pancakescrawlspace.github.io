@@ -102,6 +102,15 @@
 
   /* the keyboard */
   .keyboard-scroll { overflow-x: auto; padding-bottom: .25rem; }
+  /* The keys keep every finger to themselves, so a chord isn't taken for a
+     pinch or a swipe; on a touch screen the strip below them scrolls them. */
+  @media (hover: none) {
+    .keyboard-scroll {
+      padding-bottom: 1.75rem; border-radius: 0 0 6px 6px;
+      background: repeating-linear-gradient(90deg, transparent 0 6px, var(--line) 6px 7px) bottom / 100% 1.75rem no-repeat;
+      background-attachment: local;
+    }
+  }
   .keyboard {
     --key-min: 1.4rem;
     position: relative; display: flex; height: 12rem; user-select: none; -webkit-user-select: none;
@@ -117,7 +126,7 @@
   }
   /* From the bottom up: the letter key that plays it, the name of a C (middle C's in blue). */
   .key {
-    padding: 0 0 .4rem; border-radius: 0 0 6px 6px; touch-action: manipulation;
+    padding: 0 0 .4rem; border-radius: 0 0 6px 6px; touch-action: none;
     display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
   }
   .key.white {
