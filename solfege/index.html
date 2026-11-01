@@ -90,8 +90,13 @@
   button.primary kbd { color: inherit; border-color: currentColor; opacity: .7; }
   code { font: .92em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-  /* the score */
-  #score { display: flex; gap: .5rem; flex-wrap: wrap; font-size: .9rem; }
+  /* the score and the language */
+  .top { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; font-size: .9rem; }
+  #score { display: contents; }
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .lang button { border: none; border-radius: 0; padding: .15rem .6rem; background: var(--panel); color: var(--muted); }
+  .lang button + button { border-left: 1px solid var(--line); }
+  .lang button[aria-pressed=true] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
   .chip { padding: .15rem .6rem; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
   .chip b { font-variant-numeric: tabular-nums; }
 
@@ -210,21 +215,24 @@
 <main>
   <header>
     <h1>solfege</h1>
-    <div id="score" hidden>
-      <span class="chip"><b id="score-first">0</b> in één keer</span>
-      <span class="chip"><b id="score-later">0</b> na meer pogingen</span>
-      <span class="chip"><b id="score-shown">0</b> getoond</span>
+    <div class="top">
+      <div id="score" hidden>
+        <span class="chip"><b id="score-first">0</b> <span data-t="scoreFirst"></span></span>
+        <span class="chip"><b id="score-later">0</b> <span data-t="scoreLater"></span></span>
+        <span class="chip"><b id="score-shown">0</b> <span data-t="scoreShown"></span></span>
+      </div>
+      <div class="lang" role="group" aria-label="Taal / Language">
+        <button type="button" data-lang="nl" lang="nl" title="Nederlands">NL</button>
+        <button type="button" data-lang="en" lang="en" title="English">EN</button>
+      </div>
     </div>
   </header>
-  <p class="lede">Luister naar een beginnoot en daarna een andere noot. Welke noot was de tweede?</p>
+  <p class="lede" data-t="lede"></p>
 
   <section id="welcome" class="panel">
-    <p style="margin-top: 0">Elke ronde klinkt eerst de beginnoot en dan een tweede noot in de buurt. Antwoord door de
-      tweede noot op het klavier in te drukken, door het interval tussen de twee te kiezen of door de naam te
-      typen. Is het goed, dan begint de volgende ronde.</p>
-    <p class="muted small">Met de instellingen hieronder kies je de beginnoot, hoe ver de tweede noot ervan af kan
-      liggen en het geluid.</p>
-    <button type="button" class="primary big" id="welcome-start">Start</button>
+    <p style="margin-top: 0" data-t="welcome"></p>
+    <p class="muted small" data-t="welcomeSettings"></p>
+    <button type="button" class="primary big" id="welcome-start" data-t="start"></button>
   </section>
 
   <div id="playing" hidden>
@@ -233,10 +241,10 @@
       <p class="start-note" id="start-note"></p>
       <p class="start-label" id="start-label"></p>
       <div class="play">
-        <button type="button" class="primary big" id="play-both">Speel beide <kbd>Spatie</kbd></button>
-        <button type="button" class="big" id="play-second">Tweede noot <kbd>P</kbd></button>
-        <button type="button" class="big" id="give-up">Toon antwoord <kbd>S</kbd></button>
-        <button type="button" class="primary big" id="next" hidden>Volgende noot <kbd>N</kbd></button>
+        <button type="button" class="primary big" id="play-both" data-t="playBoth"></button>
+        <button type="button" class="big" id="play-second" data-t="playSecond"></button>
+        <button type="button" class="big" id="give-up" data-t="giveUp"></button>
+        <button type="button" class="primary big" id="next" data-t="next" hidden></button>
       </div>
       <div id="feedback" role="status" aria-live="polite"></div>
       <p id="notice" class="muted small" hidden></p>
@@ -244,83 +252,69 @@
 
     <section class="panel">
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" data-tab="keys" aria-selected="true">Klavier</button>
-        <button type="button" role="tab" data-tab="intervals" aria-selected="false">Interval</button>
-        <button type="button" role="tab" data-tab="type" aria-selected="false">Typen</button>
+        <button type="button" role="tab" data-tab="keys" aria-selected="true" data-t="tabKeys"></button>
+        <button type="button" role="tab" data-tab="intervals" aria-selected="false" data-t="tabIntervals"></button>
+        <button type="button" role="tab" data-tab="type" aria-selected="false" data-t="tabType"></button>
       </div>
 
       <div data-panel="keys" role="tabpanel">
         <div class="keyboard-scroll"><div class="keyboard" id="keyboard"></div></div>
-        <p class="legend muted small"><span class="dot"></span> de beginnoot. Een toets laat zijn noot horen en
-          antwoordt met precies die noot.</p>
+        <p class="legend muted small" data-t="legend"></p>
       </div>
 
       <div data-panel="intervals" role="tabpanel" class="intervals" id="intervals" hidden></div>
 
       <div data-panel="type" role="tabpanel" hidden>
         <form id="type-form" autocomplete="off">
-          <input type="text" id="answer" aria-label="Noot of interval" placeholder="sol, fis, eb5, 3-, -5 …"
+          <input type="text" id="answer" placeholder="sol, fis, eb5, 3-, -5 …"
                  autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
-          <button type="submit" class="primary">Controleer</button>
+          <button type="submit" class="primary" data-t="check"></button>
         </form>
         <ul class="syntax small">
-          <li><b>Een noot:</b> <code>fis</code>, <code>bes</code>, <code>es</code>, <code>as</code> enzovoort,
-            <code>c d e f g a b</code> met <code>#</code> of <code>b</code>, of de vaste do: <code>do re mi fa
-            sol la si</code>. Elk octaaf telt. Wil je precies zijn, zet het octaaf erachter: <code>d4</code>,
-            <code>eb5</code> (de centrale C is <code>c4</code>), of zoals in LilyPond <code>d'</code>,
-            <code>bes,</code>.</li>
-          <li><b>Een interval</b> vanaf de beginnoot: <code>2</code> is een grote secunde, <code>2-</code> een
-            kleine secunde, <code>4+</code> of <code>5-</code> de tritonus, <code>8</code> een octaaf. Bij 1, 4, 5
-            en 8 betekenen <code>+</code> en <code>-</code> overmatig en verminderd; bij de andere is
-            <code>-</code> klein, <code>--</code> verminderd en <code>+</code> overmatig.</li>
-          <li><b>Een richting:</b> <code>+</code> of <code>-</code> vooraan betekent omhoog of omlaag, dus
-            <code>-3-</code> is een kleine terts omlaag. Zonder teken telt elke richting.</li>
-          <li><b>Opdrachten:</b> een leeg antwoord of <code>r</code> speelt beide noten opnieuw, <code>p</code> de
-            tweede noot, <code>s</code> toont het antwoord en <code>n</code> gaat door naar de volgende noot.</li>
+          <li data-t="syntaxNote"></li>
+          <li data-t="syntaxInterval"></li>
+          <li data-t="syntaxDirection"></li>
+          <li data-t="syntaxCommands"></li>
         </ul>
       </div>
     </section>
 
     <section class="panel" id="history-panel" hidden>
-      <h2>Tot nu toe</h2>
+      <h2 data-t="soFar"></h2>
       <ul id="history"></ul>
     </section>
   </div>
 
   <form id="options" class="panel">
     <details id="options-details">
-      <summary>Instellingen</summary>
+      <summary data-t="settings"></summary>
       <div class="fields">
-        <label>Beginnoot
+        <label><span data-t="optStart"></span>
           <input type="text" id="opt-start" value="c4" autocomplete="off" autocapitalize="off" spellcheck="false">
         </label>
-        <label>Bereik (halve tonen, 1–24)
+        <label><span data-t="optRange"></span>
           <input type="number" id="opt-range" value="12" min="1" max="24">
         </label>
-        <label>Geluid
+        <label><span data-t="optSound"></span>
           <select id="opt-sound">
-            <option value="piano">Instrumentsamples</option>
-            <option value="synth">Ingebouwde toon</option>
+            <option value="piano" data-t="optSamples"></option>
+            <option value="synth" data-t="optSynth"></option>
           </select>
         </label>
-        <label>Instrument
+        <label><span data-t="optInstrument"></span>
           <select id="opt-program"></select>
         </label>
-        <label>Seed (optioneel)
+        <label><span data-t="optSeed"></span>
           <input type="number" id="opt-seed" step="1">
         </label>
         <div>
-          <label class="check"><input type="checkbox" id="opt-up"> Alleen noten boven de beginnoot</label>
-          <label class="check"><input type="checkbox" id="opt-chromatic"> Alle twaalf noten</label>
+          <label class="check"><input type="checkbox" id="opt-up"> <span data-t="optUp"></span></label>
+          <label class="check"><input type="checkbox" id="opt-chromatic"> <span data-t="optChromatic"></span></label>
         </div>
       </div>
-      <p class="muted small" style="margin: .75rem 0 0">
-        De beginnoot is een notennaam (<code>c4</code>, <code>g</code>, <code>fis'</code>, <code>bes,</code>;
-        zonder octaaf die vanaf de centrale C omhoog), of <code>willekeurig</code> voor elke ronde een nieuwe. De
-        tweede noot komt uit de majeurtoonladder van de beginnoot, tenzij je alle twaalf noten kiest.
-      </p>
+      <p class="muted small" style="margin: .75rem 0 0" data-t="optHelp"></p>
       <div class="actions">
-        <button type="submit" class="primary" id="start-button">Start</button>
+        <button type="submit" class="primary" id="start-button"></button>
         <span id="options-error" class="error" role="alert"></span>
       </div>
     </details>
@@ -365,6 +359,180 @@ const INSTRUMENTS = (
 const range = (lo, hi) => Array.from({length: hi - lo + 1}, (_, i) => lo + i);
 const mod = (a, n) => ((a % n) + n) % n;
 const normalize = text => text.trim().toLowerCase().replaceAll(" ", "");
+
+// --- languages ---------------------------------------------------------------
+
+// The page's text in Dutch (the default) and English. Strings that hold markup
+// go into the page as HTML; functions take the parts that vary.
+const STRINGS = {
+  nl: {
+    scoreFirst: "in één keer",
+    scoreLater: "na meer pogingen",
+    scoreShown: "getoond",
+    lede: "Luister naar een beginnoot en daarna een andere noot. Welke noot was de tweede?",
+    welcome: `Elke ronde klinkt eerst de beginnoot en dan een tweede noot in de buurt. Antwoord door de tweede
+      noot op het klavier in te drukken, door het interval tussen de twee te kiezen of door de naam te typen.
+      Is het goed, dan begint de volgende ronde.`,
+    welcomeSettings: `Met de instellingen hieronder kies je de beginnoot, hoe ver de tweede noot ervan af kan
+      liggen en het geluid.`,
+    start: "Start",
+    startOver: "Opnieuw beginnen",
+    playBoth: "Speel beide <kbd>Spatie</kbd>",
+    playSecond: "Tweede noot <kbd>P</kbd>",
+    giveUp: "Toon antwoord <kbd>S</kbd>",
+    next: "Volgende noot <kbd>N</kbd>",
+    tabKeys: "Klavier",
+    tabIntervals: "Interval",
+    tabType: "Typen",
+    legend: `<span class="dot"></span> de beginnoot. Een toets laat zijn noot horen en antwoordt met precies die
+      noot.`,
+    answerLabel: "Noot of interval",
+    check: "Controleer",
+    syntaxNote: `<b>Een noot:</b> <code>fis</code>, <code>bes</code>, <code>es</code>, <code>as</code> enzovoort,
+      <code>c d e f g a b</code> met <code>#</code> of <code>b</code>, of de vaste do: <code>do re mi fa sol la
+      si</code>. Elk octaaf telt. Wil je precies zijn, zet het octaaf erachter: <code>d4</code>,
+      <code>eb5</code> (de centrale C is <code>c4</code>), of zoals in LilyPond <code>d'</code>,
+      <code>bes,</code>.`,
+    syntaxInterval: `<b>Een interval</b> vanaf de beginnoot: <code>2</code> is een grote secunde, <code>2-</code>
+      een kleine secunde, <code>4+</code> of <code>5-</code> de tritonus, <code>8</code> een octaaf. Bij 1, 4, 5
+      en 8 betekenen <code>+</code> en <code>-</code> overmatig en verminderd; bij de andere is <code>-</code>
+      klein, <code>--</code> verminderd en <code>+</code> overmatig.`,
+    syntaxDirection: `<b>Een richting:</b> <code>+</code> of <code>-</code> vooraan betekent omhoog of omlaag, dus
+      <code>-3-</code> is een kleine terts omlaag. Zonder teken telt elke richting.`,
+    syntaxCommands: `<b>Opdrachten:</b> een leeg antwoord of <code>r</code> speelt beide noten opnieuw,
+      <code>p</code> de tweede noot, <code>s</code> toont het antwoord en <code>n</code> gaat door naar de
+      volgende noot.`,
+    soFar: "Tot nu toe",
+    settings: "Instellingen",
+    optStart: "Beginnoot",
+    optRange: "Bereik (halve tonen, 1–24)",
+    optSound: "Geluid",
+    optSamples: "Instrumentsamples",
+    optSynth: "Ingebouwde toon",
+    optInstrument: "Instrument",
+    optSeed: "Seed (optioneel)",
+    optUp: "Alleen noten boven de beginnoot",
+    optChromatic: "Alle twaalf noten",
+    optHelp: `De beginnoot is een notennaam (<code>c4</code>, <code>g</code>, <code>fis'</code>,
+      <code>bes,</code>; zonder octaaf die vanaf de centrale C omhoog), of <code>willekeurig</code> voor elke
+      ronde een nieuwe. De tweede noot komt uit de majeurtoonladder van de beginnoot, tenzij je alle twaalf
+      noten kiest.`,
+
+    ordinals: [null, "prime", "secunde", "terts", "kwart", "kwint", "sext", "septiem", "octaaf", "none",
+               "decime", "undecime", "duodecime", "tredecime", "quartdecime", "dubbel octaaf"],
+    perfect: "reine", augmented: "overmatige", major: "grote", minor: "kleine", tritone: "tritonus",
+    up: "omhoog", down: "omlaag", Up: "Omhoog", Down: "Omlaag",
+    from: (direction, note) => `${direction} vanaf ${note}`,
+    round: n => `Noot ${n}`,
+    startRandom: "de beginnoot, elke ronde een nieuwe",
+    startMiddleC: "de centrale C, de beginnoot",
+    startNote: "de beginnoot",
+    startAria: ", de beginnoot",
+    wrongDirection: "goede grootte, verkeerde richting",
+    wrongOctave: "goede noot, verkeerd octaaf",
+    notAnswer: "geen noot of interval",
+    noNotes: "Geen noten om uit te kiezen.",
+    widen: chromatic => "Vergroot het bereik" + (chromatic ? "" : " of kies alle twaalf noten") + " in de instellingen.",
+    notThat: "Die is het niet.",
+    tryAgain: "Probeer het nog eens, of laat de noten opnieuw horen.",
+    right: "Goed!",
+    itWas: note => `Het was ${note}.`,
+    tries: n => `${n} pogingen`,
+    errStart: "De beginnoot is geen noot en ook niet “willekeurig”.",
+    errStartRange: "De beginnoot moet tussen A0 en C8 liggen.",
+    errRange: "Het bereik moet tussen 1 en 24 liggen.",
+    errSeed: "De seed moet een geheel getal zijn.",
+    notice: "De instrumentsamples konden niet worden geladen, dus nu klinkt de ingebouwde toon.",
+  },
+  en: {
+    scoreFirst: "first try",
+    scoreLater: "more tries",
+    scoreShown: "shown",
+    lede: "Listen to a start note and then another note. Which note was the second one?",
+    welcome: `Each round plays the start note, then a second note near it. Answer by pressing the second note on
+      the keyboard, by choosing the interval between the two, or by typing its name. Get it right and the next
+      round starts.`,
+    welcomeSettings: `The settings below choose the start note, how far away the second note can be, and the
+      sound.`,
+    start: "Start",
+    startOver: "Start over",
+    playBoth: "Play both <kbd>Space</kbd>",
+    playSecond: "Second note <kbd>P</kbd>",
+    giveUp: "Show answer <kbd>S</kbd>",
+    next: "Next note <kbd>N</kbd>",
+    tabKeys: "Keyboard",
+    tabIntervals: "Interval",
+    tabType: "Type it",
+    legend: `<span class="dot"></span> the start note. Pressing a key plays it and answers with that exact
+      note.`,
+    answerLabel: "Note or interval",
+    check: "Check",
+    syntaxNote: `<b>A note:</b> <code>c d e f g a b</code> with <code>#</code> or <code>b</code>, Dutch
+      <code>fis</code>, <code>bes</code>, <code>es</code>, <code>as</code>, or fixed do: <code>do re mi fa sol la
+      si</code>. Any octave counts. To be exact, add one: <code>d4</code>, <code>eb5</code> (middle C is
+      <code>c4</code>), or LilyPond style <code>d'</code>, <code>bes,</code>.`,
+    syntaxInterval: `<b>An interval</b> from the start note: <code>2</code> is a major second, <code>2-</code> a
+      minor second, <code>4+</code> or <code>5-</code> the tritone, <code>8</code> an octave. For 1, 4, 5 and 8,
+      <code>+</code> and <code>-</code> mean augmented and diminished; for the others, <code>-</code> is minor,
+      <code>--</code> diminished and <code>+</code> augmented.`,
+    syntaxDirection: `<b>A direction:</b> put <code>+</code> or <code>-</code> in front for up or down, so
+      <code>-3-</code> is a minor third down. Without one, either direction counts.`,
+    syntaxCommands: `<b>Commands:</b> an empty answer or <code>r</code> plays both notes again, <code>p</code> the
+      second note, <code>s</code> shows the answer and <code>n</code> goes on to the next note.`,
+    soFar: "So far",
+    settings: "Settings",
+    optStart: "Start note",
+    optRange: "Range (semitones, 1–24)",
+    optSound: "Sound",
+    optSamples: "Instrument samples",
+    optSynth: "Built-in tone",
+    optInstrument: "Instrument",
+    optSeed: "Seed (optional)",
+    optUp: "Only notes above the start note",
+    optChromatic: "All twelve notes",
+    optHelp: `The start note is any note name (<code>c4</code>, <code>g</code>, <code>fis'</code>,
+      <code>bes,</code>; without an octave, the one from middle C up), or <code>random</code> for a new one
+      every round. The second note comes from the start note's major scale, unless you choose all twelve
+      notes.`,
+
+    ordinals: [null, "unison", "second", "third", "fourth", "fifth", "sixth", "seventh", "octave", "ninth",
+               "tenth", "eleventh", "twelfth", "thirteenth", "fourteenth", "double octave"],
+    perfect: "perfect", augmented: "augmented", major: "major", minor: "minor", tritone: "tritone",
+    up: "up", down: "down", Up: "Up", Down: "Down",
+    from: (direction, note) => `${direction} from ${note}`,
+    round: n => `Note ${n}`,
+    startRandom: "the start note, new every round",
+    startMiddleC: "middle C, the start note",
+    startNote: "the start note",
+    startAria: ", the start note",
+    wrongDirection: "right size, wrong direction",
+    wrongOctave: "right note, wrong octave",
+    notAnswer: "not a note or an interval",
+    noNotes: "No notes to choose from.",
+    widen: chromatic => "Widen the range" + (chromatic ? "" : " or choose all twelve notes") + " in the settings.",
+    notThat: "Not that one.",
+    tryAgain: "Try again, or play the notes once more.",
+    right: "Right!",
+    itWas: note => `It was ${note}.`,
+    tries: n => `${n} tries`,
+    errStart: "The start note is not a note or “random”.",
+    errStartRange: "The start note must be between A0 and C8.",
+    errRange: "The range must be between 1 and 24.",
+    errSeed: "The seed must be a whole number.",
+    notice: "The instrument samples couldn't be loaded, so this uses the built-in tone.",
+  },
+};
+
+let lang = "nl";
+try {
+  const saved = localStorage.getItem("solfege.lang");
+  if (saved && Object.hasOwn(STRINGS, saved)) lang = saved;
+} catch {}
+
+function t(key, ...args) {
+  const text = STRINGS[lang][key];
+  return typeof text === "function" ? text(...args) : text;
+}
 
 // --- parsing answers ---------------------------------------------------------
 
@@ -429,9 +597,6 @@ const SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 const FLATS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 const SIMPLE = [[1, ""], [2, "-"], [2, ""], [3, "-"], [3, ""], [4, ""], [4, "+"], [5, ""],
                 [6, "-"], [6, ""], [7, "-"], [7, ""]];
-const ORDINALS = [null, "prime", "secunde", "terts", "kwart", "kwint", "sext",
-                  "septiem", "octaaf", "none", "decime", "undecime", "duodecime",
-                  "tredecime", "quartdecime", "dubbel octaaf"];
 
 function noteName(midi) {
   const octave = Math.floor(midi / 12), pc = midi % 12;
@@ -447,23 +612,23 @@ function intervalParts(semis) {
   n += 7 * octaves;
   let quality;
   if ([0, 3, 4].includes((n - 1) % 7)) {
-    quality = mod ? "overmatige" : "reine";
+    quality = t(mod ? "augmented" : "perfect");
   } else {
-    quality = mod ? "kleine" : "grote";
+    quality = t(mod ? "minor" : "major");
   }
-  let words = [1, 8, 15].includes(n) ? ORDINALS[n] : `${quality} ${ORDINALS[n]}`;
+  const ordinal = t("ordinals")[n];
+  let words = [1, 8, 15].includes(n) ? ordinal : `${quality} ${ordinal}`;
   let short = `${n}${mod}`;
   if (rest === 6) {
     short += ` = ${n + 1}-`;
-    words += ", tritonus";
+    words += `, ${t("tritone")}`;
   }
   return {answer: `${n}${mod}`, short, words};
 }
 
 function intervalName(semis) {
   const {short, words} = intervalParts(semis);
-  const direction = semis > 0 ? "omhoog" : "omlaag";
-  return `${short} ${direction} (${words})`;
+  return `${short} ${t(semis > 0 ? "up" : "down")} (${words})`;
 }
 
 // --- sound -------------------------------------------------------------------
@@ -603,7 +768,7 @@ function parseStart(text) {
   return note ? note[1] : undefined;
 }
 
-// Return [correct, remark].
+// Return [correct, remark], the remark being a key of STRINGS.
 function check(answer, target, start) {
   const dist = target - start;
   const iv = parseInterval(answer);
@@ -611,7 +776,7 @@ function check(answer, target, start) {
     const [semis, direction] = iv;
     if (semis !== Math.abs(dist)) return [false, null];
     if (direction !== null && direction !== (dist > 0 ? 1 : -1)) {
-      return [false, "goede grootte, verkeerde richting"];
+      return [false, "wrongDirection"];
     }
     return [true, null];
   }
@@ -619,10 +784,10 @@ function check(answer, target, start) {
   if (note !== null) {
     const [pc, midi] = note;
     if (pc !== target % 12) return [false, null];
-    if (midi !== null && midi !== target) return [false, "goede noot, verkeerd octaaf"];
+    if (midi !== null && midi !== target) return [false, "wrongOctave"];
     return [true, null];
   }
-  return [false, "geen noot of interval"];
+  return [false, "notAnswer"];
 }
 
 // mulberry32: a small seeded generator, for the seed option.
@@ -664,6 +829,7 @@ class Game {
     this.rounds = this.firstTime = this.later = this.givenUp = 0;
     this.phase = "asking";
     this.over = false;
+    this.history = [];
   }
 
   choice(list) {
@@ -687,8 +853,7 @@ class Game {
     }
     if (!choices.length) {
       this.over = true;
-      showFeedback("no", "Geen noten om uit te kiezen.",
-                   "Vergroot het bereik" + (this.opts.chromatic ? "" : " of kies alle twaalf noten") + " in de instellingen.");
+      showFeedback("no", () => t("noNotes"), () => t("widen", this.opts.chromatic));
       return null;
     }
     this.target = this.choice(choices);
@@ -710,15 +875,16 @@ class Game {
     const [ok, remark] = check(normalize(text), this.target, this.start);
     if (!ok) {
       el?.classList.add("wrong");
-      showFeedback("no", "Die is het niet.", remark ? capitalize(remark) + "." : "Probeer het nog eens, of laat de noten opnieuw horen.");
+      showFeedback("no", () => t("notThat"), () => remark ? capitalize(t(remark)) + "." : t("tryAgain"));
       return false;
     }
     this.phase = "right";
     if (this.tries === 1) this.firstTime++; else this.later++;
     el?.classList.add("right");
     markAnswer(this);
-    showFeedback("yes", "Goed!", `${noteName(this.target)} · ${intervalName(this.target - this.start)}`);
-    addHistory(this, this.tries === 1 ? ["first", "in één keer"] : ["later", `${this.tries} pogingen`]);
+    const {start, target} = this;
+    showFeedback("yes", () => t("right"), () => `${noteName(target)} · ${intervalName(target - start)}`);
+    addHistory(this, this.tries === 1 ? "first" : "later");
     renderScore(this);
     setTimeout(() => this.nextRound(), 1000);
     return true;
@@ -729,8 +895,9 @@ class Game {
     this.phase = "shown";
     this.givenUp++;
     markAnswer(this);
-    showFeedback("", `Het was ${noteName(this.target)}.`, intervalName(this.target - this.start));
-    addHistory(this, ["shown", "getoond"]);
+    const {start, target} = this;
+    showFeedback("", () => t("itWas", noteName(target)), () => intervalName(target - start));
+    addHistory(this, "shown");
     renderScore(this);
     setButtons(this);
     this.playBoth();
@@ -752,18 +919,27 @@ const $ = id => document.getElementById(id);
 const capitalize = s => s[0].toUpperCase() + s.slice(1);
 const isBlack = midi => [1, 3, 6, 8, 10].includes(midi % 12);
 let game = null, sound = null;
+let feedback = null;        // what the feedback box shows, kept to redraw it in another language
+let optionsError = null;    // the key of the settings' error message
 
+// title and detail are functions, so they can be drawn again in another language.
 function showFeedback(kind, title, detail) {
+  feedback = {kind, title, detail};
+  drawFeedback();
+}
+
+function drawFeedback() {
   const box = $("feedback");
-  box.className = kind;
+  box.className = feedback?.kind ?? "";
   box.replaceChildren();
-  const t = document.createElement("div");
-  t.className = "title";
-  t.textContent = title;
-  const d = document.createElement("div");
-  d.className = "muted";
-  d.textContent = detail;
-  box.append(t, d);
+  if (!feedback) return;
+  const title = document.createElement("div");
+  title.className = "title";
+  title.textContent = feedback.title();
+  const detail = document.createElement("div");
+  detail.className = "muted";
+  detail.textContent = feedback.detail();
+  box.append(title, detail);
 }
 
 function renderScore(g) {
@@ -779,15 +955,18 @@ function setButtons(g) {
 }
 
 function renderRound(g) {
-  $("round").textContent = `Noot ${g.rounds}`;
   $("start-note").textContent = noteName(g.start);
-  $("start-label").textContent = g.randomStart ? "de beginnoot, elke ronde een nieuwe"
-                               : g.start === MIDDLE_C ? "de centrale C, de beginnoot" : "de beginnoot";
-  $("feedback").replaceChildren();
-  $("feedback").className = "";
+  labelRound(g);
+  feedback = null;
+  drawFeedback();
   setButtons(g);
   renderKeyboard(g);
   renderIntervals(g);
+}
+
+function labelRound(g) {
+  $("round").textContent = t("round", g.rounds);
+  $("start-label").textContent = t(g.randomStart ? "startRandom" : g.start === MIDDLE_C ? "startMiddleC" : "startNote");
 }
 
 // The keys from the lowest to the highest note the round can have, widened to
@@ -807,7 +986,7 @@ function renderKeyboard(g) {
     key.type = "button";
     key.className = "key " + (isBlack(pitch) ? "black" : "white");
     key.dataset.pitch = pitch;
-    key.setAttribute("aria-label", noteName(pitch) + (pitch === g.start ? ", de beginnoot" : ""));
+    key.setAttribute("aria-label", noteName(pitch) + (pitch === g.start ? t("startAria") : ""));
     if (pitch === g.start) key.classList.add("start");
     if (isBlack(pitch)) {
       const left = whites.filter(n => n < pitch).length * width;
@@ -827,29 +1006,38 @@ function renderKeyboard(g) {
 function renderIntervals(g) {
   const box = $("intervals");
   box.replaceChildren();
-  const directions = g.opts.up ? [[1, "Omhoog"]] : [[-1, "Omlaag"], [1, "Omhoog"]];
-  for (const [sign, label] of directions) {
+  for (const sign of g.opts.up ? [1] : [-1, 1]) {
     const group = document.createElement("div");
     group.className = "group";
+    group.dataset.sign = sign;
     const h = document.createElement("h3");
-    h.textContent = `${label} vanaf ${noteName(g.start)}`;
     const grid = document.createElement("div");
     grid.className = "interval-grid";
     for (let semis = 1; semis <= g.opts.range; semis++) {
-      const {answer, short, words} = intervalParts(semis);
+      const {answer, short} = intervalParts(semis);
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.answer = (sign > 0 ? "+" : "-") + answer;
       button.dataset.semis = sign * semis;
       const b = document.createElement("b");
       b.textContent = short;
-      const span = document.createElement("span");
-      span.textContent = words;
-      button.append(b, span);
+      button.append(b, document.createElement("span"));
       grid.append(button);
     }
     group.append(h, grid);
     box.append(group);
+  }
+  labelIntervals(g);
+}
+
+// The words on the interval buttons, which change with the language.
+function labelIntervals(g) {
+  for (const group of $("intervals").children) {
+    const direction = t(group.dataset.sign > 0 ? "Up" : "Down");
+    group.querySelector("h3").textContent = t("from", direction, noteName(g.start));
+    for (const button of group.querySelectorAll("button")) {
+      button.querySelector("span").textContent = intervalParts(Number(button.dataset.semis)).words;
+    }
   }
 }
 
@@ -859,21 +1047,52 @@ function markAnswer(g) {
   $("intervals").querySelector(`[data-semis="${g.target - g.start}"]`)?.classList.add("right");
 }
 
-function addHistory(g, [cls, text]) {
-  const li = document.createElement("li");
-  const what = document.createElement("span");
-  what.className = "what";
-  what.textContent = `${noteName(g.start)} → ${noteName(g.target)}`;
-  const how = document.createElement("span");
-  how.className = "how";
-  how.textContent = intervalName(g.target - g.start);
-  const result = document.createElement("span");
-  result.className = `result ${cls}`;
-  result.textContent = text;
-  li.append(what, result, how);
-  $("history").prepend(li);
-  while ($("history").children.length > 10) $("history").lastChild.remove();
+// result is "first", "later" (more tries) or "shown".
+function addHistory(g, result) {
+  g.history.unshift({start: g.start, target: g.target, result, tries: g.tries});
+  g.history.length = Math.min(g.history.length, 10);
+  drawHistory(g);
   $("history-panel").hidden = false;
+}
+
+function drawHistory(g) {
+  $("history").replaceChildren(...g.history.map(({start, target, result, tries}) => {
+    const li = document.createElement("li");
+    const what = document.createElement("span");
+    what.className = "what";
+    what.textContent = `${noteName(start)} → ${noteName(target)}`;
+    const how = document.createElement("span");
+    how.className = "how";
+    how.textContent = intervalName(target - start);
+    const badge = document.createElement("span");
+    badge.className = `result ${result}`;
+    badge.textContent = result === "first" ? t("scoreFirst") : result === "later" ? t("tries", tries) : t("scoreShown");
+    li.append(what, badge, how);
+    return li;
+  }));
+}
+
+// Put the page in a language, and redraw what is already on it.
+function setLanguage(name) {
+  lang = name;
+  try { localStorage.setItem("solfege.lang", name); } catch {}
+  document.documentElement.lang = name;
+  for (const el of document.querySelectorAll("[data-t]")) el.innerHTML = t(el.dataset.t);
+  for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
+  $("answer").setAttribute("aria-label", t("answerLabel"));
+  $("start-button").textContent = t(game ? "startOver" : "start");
+  $("notice").textContent = t("notice");
+  $("options-error").textContent = optionsError ? t(optionsError) : "";
+  if (!game) return;
+  labelRound(game);
+  labelIntervals(game);
+  $("keyboard").querySelector(".start")?.setAttribute("aria-label", noteName(game.start) + t("startAria"));
+  drawFeedback();
+  drawHistory(game);
+}
+
+for (const b of document.querySelectorAll("[data-lang]")) {
+  b.addEventListener("click", () => setLanguage(b.dataset.lang));
 }
 
 // --- tabs, keys and buttons --------------------------------------------------
@@ -988,18 +1207,19 @@ function writeUrl(opts) {
   history.replaceState(null, "", search ? `?${search}` : location.pathname);
 }
 
+// An error's message is the key of its text in STRINGS.
 function readOptions() {
   const start = parseStart($("opt-start").value);
-  if (start === undefined) throw new Error("De beginnoot is geen noot en ook niet “willekeurig”.");
+  if (start === undefined) throw new Error("errStart");
   if (start !== null && (start < PIANO[0] || start > PIANO[1])) {
-    throw new Error("De beginnoot moet tussen A0 en C8 liggen.");
+    throw new Error("errStartRange");
   }
   const rangeValue = Number($("opt-range").value);
   if (!Number.isInteger(rangeValue) || rangeValue < 1 || rangeValue > 24) {
-    throw new Error("Het bereik moet tussen 1 en 24 liggen.");
+    throw new Error("errRange");
   }
   const seedText = $("opt-seed").value.trim();
-  if (seedText && !Number.isInteger(Number(seedText))) throw new Error("De seed moet een geheel getal zijn.");
+  if (seedText && !Number.isInteger(Number(seedText))) throw new Error("errSeed");
   return {
     start,
     range: rangeValue,
@@ -1016,18 +1236,17 @@ function newGame() {
   try {
     opts = readOptions();
   } catch (e) {
-    $("options-error").textContent = e.message;
+    optionsError = e.message;
+    $("options-error").textContent = t(optionsError);
     $("options-details").open = true;
     return;
   }
+  optionsError = null;
   $("options-error").textContent = "";
   writeUrl(opts);
   game?.end();
   sound?.ctx.close();
-  sound = new Sound(opts.synth, opts.program, () => {
-    $("notice").textContent = "De instrumentsamples konden niet worden geladen, dus nu klinkt de ingebouwde toon.";
-    $("notice").hidden = false;
-  });
+  sound = new Sound(opts.synth, opts.program, () => { $("notice").hidden = false; });
   $("notice").hidden = true;
   $("history").replaceChildren();
   $("history-panel").hidden = true;
@@ -1035,8 +1254,8 @@ function newGame() {
   $("playing").hidden = false;
   $("score").hidden = false;
   $("options-details").open = false;
-  $("start-button").textContent = "Opnieuw beginnen";
   game = new Game(opts, sound);
+  $("start-button").textContent = t("startOver");
   game.begin();
   $("play-both").focus();
 }
@@ -1044,6 +1263,7 @@ function newGame() {
 $("options").addEventListener("submit", e => { e.preventDefault(); newGame(); });
 $("welcome-start").addEventListener("click", newGame);
 
+setLanguage(lang);
 readUrl();
 
 // Keep the page and the samples for offline use, which also lets browsers
