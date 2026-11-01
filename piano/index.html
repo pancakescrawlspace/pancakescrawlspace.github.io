@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="nl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -53,6 +53,12 @@
   h1 { font-size: 1.6rem; margin: 0; letter-spacing: .02em; }
   a { color: var(--accent); }
   .lede { margin: .25rem 0 1.25rem; color: var(--muted); }
+  /* the link to solfege and the language */
+  .top { display: flex; gap: .75rem; align-items: center; }
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; font-size: .9rem; }
+  .lang button { border: none; border-radius: 0; padding: .15rem .6rem; background: var(--panel); color: var(--muted); }
+  .lang button + button { border-left: 1px solid var(--line); }
+  .lang button[aria-pressed=true] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
   .muted { color: var(--muted); }
   .small { font-size: .9rem; }
   .panel {
@@ -86,7 +92,8 @@
 
   /* recording */
   .toolbar { display: flex; gap: .5rem 1rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
-  .toolbar .buttons { display: flex; gap: .5rem; }
+  .toolbar .buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .toolbar .buttons button { white-space: nowrap; }
   #status { flex: 1; min-width: 10rem; }
   .dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%; background: var(--no); margin-right: .45rem; }
   #record.recording { border-color: var(--no); color: var(--no); font-weight: 600; }
@@ -163,39 +170,43 @@
     <!-- A hard-coded relative path to the solfege page, right for this repo (piano/ next to web/).
          Where the pages are deployed elsewhere, such as the github.io site with the solfege page in
          solfege/, change it to match (with piano/ next to solfege/ there: ../solfege/). -->
-    <a href="../solfege/" class="small">solfege</a>
+    <div class="top">
+      <a href="../solfege/" class="small">solfege</a>
+      <div class="lang" role="group" aria-label="Taal / Language">
+        <button type="button" data-lang="nl" lang="nl" title="Nederlands">NL</button>
+        <button type="button" data-lang="en" lang="en" title="English">EN</button>
+      </div>
+    </div>
   </header>
-  <p class="lede">Play the keys, or record a run of notes and play it back.</p>
+  <p class="lede" data-t="lede"></p>
   <div id="install" class="install small" hidden>
-    <button type="button" class="primary" id="install-button" hidden>Install as app</button>
-    <span class="text muted" id="install-ios" hidden>To have it as an app on your home screen: tap
-      <b>Share</b> <svg width="13" height="16" viewBox="0 0 13 16" aria-hidden="true" style="vertical-align: -2px"><path d="M6.5 1v9M3 4.5 6.5 1 10 4.5M4 7H1.5v8h10V7H9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> (in Safari sometimes under <b>···</b>) and choose <b>Add to Home Screen</b>.</span>
-    <button type="button" class="hide" id="install-hide" aria-label="Hide">×</button>
+    <button type="button" class="primary" id="install-button" data-t="installButton" hidden></button>
+    <span class="text muted" id="install-ios" data-t="installIos" hidden></span>
+    <button type="button" class="hide" id="install-hide">×</button>
   </div>
 
   <section class="panel">
     <div class="toolbar">
       <div class="buttons">
-        <button type="button" id="record"><span class="dot"></span><span class="label">Record</span> <kbd>Enter</kbd></button>
-        <button type="button" class="primary" id="play" disabled><span class="label">Play</span> <kbd>Space</kbd></button>
+        <button type="button" id="record"><span class="dot"></span><span class="label"></span> <kbd>Enter</kbd></button>
+        <button type="button" class="primary" id="play" disabled><span class="label"></span> <kbd data-t="space"></kbd></button>
       </div>
       <span id="status" class="muted small" role="status" aria-live="polite"></span>
       <div class="settings">
-        <label class="setting">Release
+        <label class="setting"><span data-t="release"></span>
           <select id="release">
-            <option value="0.1">Short, 0.1 s</option>
-            <option value="0.3" selected>Medium, 0.3 s</option>
-            <option value="1">Long, 1 s</option>
+            <option value="0.1" data-t="releaseShort"></option>
+            <option value="0.3" data-t="releaseMedium" selected></option>
+            <option value="1" data-t="releaseLong"></option>
           </select>
         </label>
-        <label class="setting">Octaves
+        <label class="setting"><span data-t="octaves"></span>
           <input type="number" id="octaves" value="4" min="1" max="7">
         </label>
       </div>
     </div>
     <div class="keyboard-scroll"><div class="keyboard" id="keyboard"></div></div>
-    <p class="hint muted small">The letters on the keys are the computer keys that play them. <kbd>↓</kbd> and
-      <kbd>↑</kbd> move them an octave down or up.</p>
+    <p class="hint muted small" data-t="hint"></p>
     <p id="notice" class="muted small" hidden></p>
   </section>
 </main>
@@ -224,6 +235,77 @@ function noteName(midi) {
   const octave = Math.floor(midi / 12), pc = midi % 12;
   const names = [...new Set([SHARPS[pc], FLATS[pc]])];
   return names.map(n => `${n}${octave - 1}`).join(" / ");
+}
+
+// --- languages ---------------------------------------------------------------
+
+// The page's text in Dutch (the default) and English. Strings that hold markup
+// go into the page as HTML; functions take the parts that vary.
+const STRINGS = {
+  nl: {
+    lede: "Speel op de toetsen, of neem een reeks noten op en speel die af.",
+    installButton: "Installeer als app",
+    installIos: `Als app op je beginscherm: tik op <b>Deel</b> <svg width="13" height="16" viewBox="0 0 13 16" aria-hidden="true" style="vertical-align: -2px"><path d="M6.5 1v9M3 4.5 6.5 1 10 4.5M4 7H1.5v8h10V7H9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> (in Safari soms onder <b>···</b>) en kies
+      <b>Zet op beginscherm</b>.`,
+    installHide: "Verberg",
+    record: "Opnemen",
+    play: "Afspelen",
+    stop: "Stop",
+    space: "Spatie",
+    release: "Uitklinktijd",
+    releaseShort: "Kort, 0,1 s",
+    releaseMedium: "Middel, 0,3 s",
+    releaseLong: "Lang, 1 s",
+    octaves: "Octaven",
+    hint: `De letters op de pianotoetsen zijn de toetsen van je toetsenbord die ze laten klinken. <kbd>↓</kbd> en
+      <kbd>↑</kbd> schuiven ze een octaaf omlaag of omhoog.`,
+    middleC: ", de centrale C",
+    notes: n => `${n} ${n === 1 ? "noot" : "noten"}`,
+    waiting: "Opname: die begint bij de eerste noot.",
+    recordingSoFar: n => `Opname… ${n} tot nu toe`,
+    playing: summary => `Speelt ${summary} af`,
+    recorded: summary => `Opgenomen: ${summary}`,
+    nothing: "Nog niets opgenomen.",
+    notice: "De pianosamples konden niet worden geladen, dus nu klinkt de ingebouwde toon.",
+  },
+  en: {
+    lede: "Play the keys, or record a run of notes and play it back.",
+    installButton: "Install as app",
+    installIos: `To have it as an app on your home screen: tap <b>Share</b> <svg width="13" height="16" viewBox="0 0 13 16" aria-hidden="true" style="vertical-align: -2px"><path d="M6.5 1v9M3 4.5 6.5 1 10 4.5M4 7H1.5v8h10V7H9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> (in Safari sometimes under
+      <b>···</b>) and choose <b>Add to Home Screen</b>.`,
+    installHide: "Hide",
+    record: "Record",
+    play: "Play",
+    stop: "Stop",
+    space: "Space",
+    release: "Release",
+    releaseShort: "Short, 0.1 s",
+    releaseMedium: "Medium, 0.3 s",
+    releaseLong: "Long, 1 s",
+    octaves: "Octaves",
+    hint: `The letters on the keys are the computer keys that play them. <kbd>↓</kbd> and <kbd>↑</kbd> move them
+      an octave down or up.`,
+    middleC: ", middle C",
+    notes: n => `${n} note${n === 1 ? "" : "s"}`,
+    waiting: "Recording: it starts at the first note.",
+    recordingSoFar: n => `Recording… ${n} so far`,
+    playing: summary => `Playing ${summary}`,
+    recorded: summary => `Recorded: ${summary}`,
+    nothing: "Nothing recorded yet.",
+    notice: "The piano samples couldn't be loaded, so this uses the built-in tone.",
+  },
+};
+
+// The same key as the solfege page's, so on one site the two pages share the choice.
+let lang = "nl";
+try {
+  const saved = localStorage.getItem("solfege.lang");
+  if (saved && Object.hasOwn(STRINGS, saved)) lang = saved;
+} catch {}
+
+function t(key, ...args) {
+  const text = STRINGS[lang][key];
+  return typeof text === "function" ? text(...args) : text;
 }
 
 // --- sound -------------------------------------------------------------------
@@ -348,10 +430,7 @@ const $ = id => document.getElementById(id);
 const isBlack = midi => [1, 3, 6, 8, 10].includes(midi % 12);
 const keyFor = pitch => $("keyboard").querySelector(`[data-pitch="${pitch}"]`);
 
-const sound = new Sound(() => {
-  $("notice").textContent = "The piano samples couldn't be loaded, so this uses the built-in tone.";
-  $("notice").hidden = false;
-});
+const sound = new Sound(() => { $("notice").hidden = false; });
 
 const sounding = new Map();      // pitch -> the function that lets it go
 
@@ -444,15 +523,16 @@ function renderRecorder() {
   const r = recorder;
   const notes = r.run.filter(([, , down]) => down).length;
   const length = r.run.length ? r.run.at(-1)[0] : 0;
-  const summary = `${notes} note${notes === 1 ? "" : "s"}, ${length.toFixed(1)} s`;
+  const seconds = length.toLocaleString(lang, {minimumFractionDigits: 1, maximumFractionDigits: 1});
+  const summary = `${t("notes", notes)}, ${seconds} s`;
   $("status").textContent =
-      r.recording ? (r.t0 === null ? "Recording: it starts at the first note." : `Recording… ${notes} so far`)
-    : r.playing ? `Playing ${summary}`
-    : notes ? `Recorded: ${summary}`
-    : "Nothing recorded yet.";
+      r.recording ? (r.t0 === null ? t("waiting") : t("recordingSoFar", notes))
+    : r.playing ? t("playing", summary)
+    : notes ? t("recorded", summary)
+    : t("nothing");
   $("record").classList.toggle("recording", r.recording);
-  $("record").querySelector(".label").textContent = r.recording ? "Stop" : "Record";
-  $("play").querySelector(".label").textContent = r.playing ? "Stop" : "Play";
+  $("record").querySelector(".label").textContent = t(r.recording ? "stop" : "record");
+  $("play").querySelector(".label").textContent = t(r.playing ? "stop" : "play");
   $("play").disabled = !r.playing && !r.run.length;
 }
 
@@ -476,7 +556,7 @@ function renderKeyboard(octaves) {
     key.type = "button";
     key.className = "key " + (isBlack(pitch) ? "black" : "white");
     key.dataset.pitch = pitch;
-    key.setAttribute("aria-label", noteName(pitch) + (pitch === MIDDLE_C ? ", middle C" : ""));
+    key.setAttribute("aria-label", noteName(pitch) + (pitch === MIDDLE_C ? t("middleC") : ""));
     if (pitch === MIDDLE_C) key.classList.add("middle");
     if (sounding.has(pitch)) key.classList.add("down");
     if (isBlack(pitch)) {
@@ -616,6 +696,23 @@ window.addEventListener("blur", () => {
 
 // --- buttons and settings ----------------------------------------------------
 
+// Put the page in a language, and redraw what is already on it.
+function setLanguage(name) {
+  lang = name;
+  try { localStorage.setItem("solfege.lang", name); } catch {}
+  document.documentElement.lang = name;
+  for (const el of document.querySelectorAll("[data-t]")) el.innerHTML = t(el.dataset.t);
+  for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
+  $("install-hide").setAttribute("aria-label", t("installHide"));
+  $("notice").textContent = t("notice");
+  $("keyboard").querySelector(".middle")?.setAttribute("aria-label", noteName(MIDDLE_C) + t("middleC"));
+  renderRecorder();
+}
+
+for (const b of document.querySelectorAll("[data-lang]")) {
+  b.addEventListener("click", () => setLanguage(b.dataset.lang));
+}
+
 $("record").addEventListener("click", () => recorder.recording ? recorder.stop() : recorder.record());
 $("play").addEventListener("click", () => recorder.playing ? recorder.stop() : recorder.play());
 
@@ -655,7 +752,7 @@ if (fromUrl.has("release")) $("release").value = fromUrl.get("release");
 $("octaves").value = readOctaves();
 $("release").value = sound.release = readRelease();
 renderKeyboard(readOctaves());
-renderRecorder();
+setLanguage(lang);
 
 // --- installing it as an app ---------------------------------------------------
 

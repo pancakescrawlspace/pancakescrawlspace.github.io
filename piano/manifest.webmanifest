@@ -1,7 +1,8 @@
 {
   "name": "piano",
   "short_name": "piano",
-  "description": "A piano keyboard that records and plays back a run of notes.",
+  "description": "Een pianoklavier dat een reeks noten opneemt en weer afspeelt.",
+  "lang": "nl",
   "id": "./",
   "start_url": "./",
   "scope": "./",
