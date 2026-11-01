@@ -208,6 +208,10 @@
   }
   .actions { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
   .error { color: var(--no); }
+  /* installing it as an app */
+  .install { display: flex; gap: .5rem .75rem; align-items: center; margin: -.5rem 0 1rem; }
+  .install .text { flex: 1; }
+  .install .hide { border: none; background: none; padding: .2rem .5rem; color: var(--muted); font-size: 1.2rem; line-height: 1; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -228,6 +232,11 @@
     </div>
   </header>
   <p class="lede" data-t="lede"></p>
+  <div id="install" class="install small" hidden>
+    <button type="button" class="primary" id="install-button" data-t="installButton" hidden></button>
+    <span class="text muted" id="install-ios" data-t="installIos" hidden></span>
+    <button type="button" class="hide" id="install-hide">×</button>
+  </div>
 
   <section id="welcome" class="panel">
     <p style="margin-top: 0" data-t="welcome"></p>
@@ -443,6 +452,10 @@ const STRINGS = {
     errRange: "Het bereik moet tussen 1 en 24 liggen.",
     errSeed: "De seed moet een geheel getal zijn.",
     notice: "De instrumentsamples konden niet worden geladen, dus nu klinkt de ingebouwde toon.",
+    installButton: "Installeer als app",
+    installIos: `Als app op je beginscherm: tik op <b>Deel</b> <svg width="13" height="16" viewBox="0 0 13 16" aria-hidden="true" style="vertical-align: -2px"><path d="M6.5 1v9M3 4.5 6.5 1 10 4.5M4 7H1.5v8h10V7H9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> (in Safari soms onder <b>···</b>) en kies
+      <b>Zet op beginscherm</b>.`,
+    installHide: "Verberg",
   },
   en: {
     scoreFirst: "first try",
@@ -520,6 +533,10 @@ const STRINGS = {
     errRange: "The range must be between 1 and 24.",
     errSeed: "The seed must be a whole number.",
     notice: "The instrument samples couldn't be loaded, so this uses the built-in tone.",
+    installButton: "Install as app",
+    installIos: `To have it as an app on your home screen: tap <b>Share</b> <svg width="13" height="16" viewBox="0 0 13 16" aria-hidden="true" style="vertical-align: -2px"><path d="M6.5 1v9M3 4.5 6.5 1 10 4.5M4 7H1.5v8h10V7H9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> (in Safari sometimes under
+      <b>···</b>) and choose <b>Add to Home Screen</b>.`,
+    installHide: "Hide",
   },
 };
 
@@ -1080,6 +1097,7 @@ function setLanguage(name) {
   for (const el of document.querySelectorAll("[data-t]")) el.innerHTML = t(el.dataset.t);
   for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
   $("answer").setAttribute("aria-label", t("answerLabel"));
+  $("install-hide").setAttribute("aria-label", t("installHide"));
   $("start-button").textContent = t(game ? "startOver" : "start");
   $("notice").textContent = t("notice");
   $("options-error").textContent = optionsError ? t(optionsError) : "";
@@ -1265,6 +1283,46 @@ $("welcome-start").addEventListener("click", newGame);
 
 setLanguage(lang);
 readUrl();
+
+// --- installing it as an app ---------------------------------------------------
+
+// Chrome, Edge and Samsung Internet say when the page can be installed (the
+// beforeinstallprompt event); the button then opens their install dialog, so
+// nobody has to find it in the menu. Safari on iPhone and iPad has no such
+// event, so there the page says how to add it to the home screen. Neither shows
+// once it runs as an app, or after × until the browser's data is cleared.
+let installPrompt = null;
+const runsAsApp = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);   // iPads say they are Macs
+const installHidden = () => { try { return localStorage.getItem("solfege.install-hidden") === "1"; } catch { return false; } };
+
+function showInstall() {
+  const button = !!installPrompt, ios = isIos && !runsAsApp() && !installPrompt;
+  $("install-button").hidden = !button;
+  $("install-ios").hidden = !ios;
+  $("install").hidden = installHidden() || !(button || ios);
+}
+
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();          // the page's own button replaces the browser's bar
+  installPrompt = e;
+  showInstall();
+});
+window.addEventListener("appinstalled", () => { installPrompt = null; showInstall(); });
+$("install-button").addEventListener("click", async () => {
+  const prompt = installPrompt;
+  if (!prompt) return;
+  installPrompt = null;        // each event can prompt only once; the browser sends a new one if it may ask again
+  prompt.prompt();
+  await prompt.userChoice;
+  showInstall();
+});
+$("install-hide").addEventListener("click", () => {
+  try { localStorage.setItem("solfege.install-hidden", "1"); } catch {}
+  showInstall();
+});
+showInstall();
 
 // Keep the page and the samples for offline use, which also lets browsers
 // install it as an app. This needs https or localhost, not a file.
