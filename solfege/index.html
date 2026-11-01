@@ -91,14 +91,32 @@
   code { font: .92em ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
   /* the score and the language */
-  .top { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; font-size: .9rem; }
+  .top { position: relative; display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; font-size: .9rem; }
   #score { display: contents; }
   .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
   .lang button { border: none; border-radius: 0; padding: .15rem .6rem; background: var(--panel); color: var(--muted); }
   .lang button + button { border-left: 1px solid var(--line); }
   .lang button[aria-pressed=true] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
-  .chip { padding: .15rem .6rem; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+  .chip { padding: .15rem .6rem; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); cursor: help; }
   .chip b { font-variant-numeric: tabular-nums; }
+  .chip .icon { display: none; width: 1em; height: 1em; vertical-align: -.15em; margin-right: .2em;
+                fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .chip .icon.first { stroke: var(--yes); }
+  .chip .icon.later { stroke: var(--accent); }
+  .chip .icon.shown { stroke: var(--no); }
+  /* a tooltip under the row, at its right edge, so it stays on the screen */
+  .tip {
+    position: absolute; top: calc(100% + .4rem); right: 0; z-index: 2;
+    width: max-content; max-width: min(16rem, calc(100vw - 2rem));
+    padding: .4rem .6rem; border-radius: 6px; background: var(--text); color: var(--bg);
+    font-size: .85rem; line-height: 1.35; box-shadow: 0 2px 8px rgb(0 0 0 / .2);
+  }
+  /* on smaller screens, an icon and the number instead of the words */
+  @media (max-width: 40rem) {
+    .chip { padding: .15rem .5rem; }
+    .chip .icon { display: inline-block; }
+    .chip .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
 
   /* the round */
   #stage { text-align: center; padding: 1.5rem 1rem; }
@@ -221,10 +239,13 @@
     <h1>solfege</h1>
     <div class="top">
       <div id="score" hidden>
-        <span class="chip"><b id="score-first">0</b> <span data-t="scoreFirst"></span></span>
-        <span class="chip"><b id="score-later">0</b> <span data-t="scoreLater"></span></span>
-        <span class="chip"><b id="score-shown">0</b> <span data-t="scoreShown"></span></span>
+        <button type="button" class="chip" aria-describedby="tip-first"><svg class="icon first" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5 6.5 12 13 4.5"/></svg><b id="score-first">0</b> <span class="label" data-t="scoreFirst"></span></button>
+        <button type="button" class="chip" aria-describedby="tip-later"><svg class="icon later" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M12.5 1.5v3h-3"/></svg><b id="score-later">0</b> <span class="label" data-t="scoreLater"></span></button>
+        <button type="button" class="chip" aria-describedby="tip-shown"><svg class="icon shown" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg><b id="score-shown">0</b> <span class="label" data-t="scoreShown"></span></button>
       </div>
+      <span class="tip" id="tip-first" role="tooltip" data-t="tipFirst" hidden></span>
+      <span class="tip" id="tip-later" role="tooltip" data-t="tipLater" hidden></span>
+      <span class="tip" id="tip-shown" role="tooltip" data-t="tipShown" hidden></span>
       <div class="lang" role="group" aria-label="Taal / Language">
         <button type="button" data-lang="nl" lang="nl" title="Nederlands">NL</button>
         <button type="button" data-lang="en" lang="en" title="English">EN</button>
@@ -456,6 +477,9 @@ const STRINGS = {
     installIos: `Als app op je beginscherm: tik op <b>Deel</b> <svg width="13" height="16" viewBox="0 0 13 16" aria-hidden="true" style="vertical-align: -2px"><path d="M6.5 1v9M3 4.5 6.5 1 10 4.5M4 7H1.5v8h10V7H9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> (in Safari soms onder <b>···</b>) en kies
       <b>Zet op beginscherm</b>.`,
     installHide: "Verberg",
+    tipFirst: "Het aantal noten dat je bij de eerste poging goed had.",
+    tipLater: "Het aantal noten dat je pas na meer pogingen goed had.",
+    tipShown: "Het aantal noten waarvan je het antwoord liet zien.",
   },
   en: {
     scoreFirst: "first try",
@@ -537,6 +561,9 @@ const STRINGS = {
     installIos: `To have it as an app on your home screen: tap <b>Share</b> <svg width="13" height="16" viewBox="0 0 13 16" aria-hidden="true" style="vertical-align: -2px"><path d="M6.5 1v9M3 4.5 6.5 1 10 4.5M4 7H1.5v8h10V7H9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg> (in Safari sometimes under
       <b>···</b>) and choose <b>Add to Home Screen</b>.`,
     installHide: "Hide",
+    tipFirst: "The number of notes you got right at the first try.",
+    tipLater: "The number of notes you got right after more than one try.",
+    tipShown: "The number of notes whose answer you had shown.",
   },
 };
 
@@ -1114,6 +1141,28 @@ for (const b of document.querySelectorAll("[data-lang]")) {
 }
 
 // --- tabs, keys and buttons --------------------------------------------------
+
+// The score's tooltips say what each counter counts. They show on hover with a
+// mouse, on focus from the keyboard, and on a tap; another tap, a tap
+// elsewhere or Escape closes them.
+let openTip = null;
+function showTip(chip) {
+  openTip = chip;
+  for (const c of document.querySelectorAll(".chip")) $(c.getAttribute("aria-describedby")).hidden = c !== chip;
+}
+for (const chip of document.querySelectorAll(".chip")) {
+  chip.addEventListener("pointerenter", e => { if (e.pointerType === "mouse") showTip(chip); });
+  chip.addEventListener("pointerleave", e => { if (e.pointerType === "mouse" && openTip === chip) showTip(null); });
+  chip.addEventListener("focus", () => { if (chip.matches(":focus-visible")) showTip(chip); });
+  chip.addEventListener("blur", () => { if (openTip === chip) showTip(null); });
+  chip.addEventListener("click", e => {
+    e.stopPropagation();
+    if (e.pointerType === "mouse") return;           // hovering already shows it
+    showTip(openTip === chip ? null : chip);
+  });
+}
+document.addEventListener("click", () => { if (openTip) showTip(null); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && openTip) showTip(null); });
 
 function selectTab(name) {
   for (const tab of document.querySelectorAll("[role=tab]")) {
