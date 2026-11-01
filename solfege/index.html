@@ -164,8 +164,11 @@
     position: absolute; top: 0; height: 60%; z-index: 1;
     background: var(--key-black); border: 1px solid var(--key-black);
   }
-  .key:hover:not(:disabled) { border-color: var(--key-line); filter: brightness(.94); }
-  .key.black:hover { filter: brightness(1.6); }
+  /* only with a mouse: on a touch screen a tapped key would keep it */
+  @media (hover: hover) {
+    .key:hover:not(:disabled) { border-color: var(--key-line); filter: brightness(.94); }
+    .key.black:hover { filter: brightness(1.6); }
+  }
   .key.start::before {
     content: ""; width: .55rem; height: .55rem; border-radius: 50%;
     background: var(--accent); margin-bottom: .3rem;
@@ -415,7 +418,8 @@ const STRINGS = {
     tabIntervals: "Interval",
     tabType: "Typen",
     legend: `<span class="dot"></span> de beginnoot. Een toets laat zijn noot horen en antwoordt met precies die
-      noot.`,
+      noot. Zonder alle twaalf noten antwoorden alleen de toetsen uit de toonladder van de beginnoot; de andere
+      laten alleen hun noot horen.`,
     answerLabel: "Noot of interval",
     check: "Controleer",
     syntaxNote: `<b>Een noot:</b> <code>fis</code>, <code>bes</code>, <code>es</code>, <code>as</code> enzovoort,
@@ -501,7 +505,8 @@ const STRINGS = {
     tabIntervals: "Interval",
     tabType: "Type it",
     legend: `<span class="dot"></span> the start note. Pressing a key plays it and answers with that exact
-      note.`,
+      note. Unless all twelve notes are on, only the keys of the start note's scale answer; the others just
+      play.`,
     answerLabel: "Note or interval",
     check: "Check",
     syntaxNote: `<b>A note:</b> <code>c d e f g a b</code> with <code>#</code> or <code>b</code>, Dutch
@@ -859,6 +864,10 @@ function candidates(opts, start) {
     && start + d >= PIANO[0] && start + d <= PIANO[1]).map(d => start + d);
 }
 
+// Whether a note can be the answer's pitch class: any note with chromatic,
+// otherwise one from the start note's major scale.
+const inScale = (opts, start, pitch) => opts.chromatic || MAJOR_SCALE.includes(mod(pitch - start, 12));
+
 // One session: the rounds, the score and what the page shows of them.
 // A round is "asking" until it is answered ("right") or the answer is shown
 // ("shown"); after "right" the next round starts by itself.
@@ -1187,8 +1196,9 @@ $("keyboard").addEventListener("click", e => {
   const key = e.target.closest(".key");
   if (!key || !game) return;
   const pitch = Number(key.dataset.pitch);
-  // An exact answer, such as "c#4"; after the round, a key only plays.
-  if (game.phase === "asking") {
+  // An exact answer, such as "c#4". After the round a key only plays, and so
+  // does one that can't be the answer, outside the start note's scale.
+  if (game.phase === "asking" && inScale(game.opts, game.start, pitch)) {
     const right = game.answer(SHARPS[pitch % 12].toLowerCase() + (Math.floor(pitch / 12) - 1), key);
     if (right) return;
   }

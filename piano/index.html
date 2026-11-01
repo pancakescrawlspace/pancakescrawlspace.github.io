@@ -149,8 +149,11 @@
   .shortcut { height: 1.2em; line-height: 1.2; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .key.white .shortcut { color: #8a867d; }
   .key .name { margin-bottom: .3rem; }
-  .key:hover { filter: brightness(.94); }
-  .key.black:hover { filter: brightness(1.6); }
+  /* only with a mouse: on a touch screen a tapped key would keep it */
+  @media (hover: hover) {
+    .key:hover { filter: brightness(.94); }
+    .key.black:hover { filter: brightness(1.6); }
+  }
   .key.white.down { background: var(--accent-soft); filter: none; }
   .key.black.down { background: var(--accent); border-color: var(--accent); filter: none; }
   .key.middle .name { color: #2f5fb3; font-weight: 700; }   /* the white keys are light in both themes */
