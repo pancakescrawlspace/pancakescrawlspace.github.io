@@ -153,7 +153,7 @@
   @media (hover: none) {
     kbd { display: none; }
   }
-  .key { padding: 0; border-radius: 0 0 6px 6px; touch-action: manipulation; transition: background-color .3s, border-color .3s; }
+  .key { padding: 0; border-radius: 0 0 6px 6px; touch-action: manipulation; }
   .key.white {
     flex: 1; min-width: var(--key-min);
     background: var(--key-white); border: 1px solid var(--key-line); margin-right: -1px;
@@ -1201,9 +1201,6 @@ $("keyboard").addEventListener("click", e => {
   if (game.phase === "asking" && inScale(game.opts, game.start, pitch)) {
     const right = game.answer(SHARPS[pitch % 12].toLowerCase() + (Math.floor(pitch / 12) - 1), key);
     if (right) return;
-    // A wrong key is red only for a moment, so it doesn't look held down.
-    clearTimeout(key.fade);
-    key.fade = setTimeout(() => key.classList.remove("wrong"), 1000);
   }
   sound.play([[pitch, 0.0, 0.9]]);
 });
