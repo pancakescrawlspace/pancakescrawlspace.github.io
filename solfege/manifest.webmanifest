@@ -1,7 +1,8 @@
 {
   "name": "solfege",
   "short_name": "solfege",
-  "description": "Ear training: hear a start note and another, and name the second one.",
+  "description": "Gehoortraining: hoor een beginnoot en nog een noot, en benoem de tweede.",
+  "lang": "nl",
   "id": "./",
   "start_url": "./",
   "scope": "./",
