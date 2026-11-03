@@ -8,32 +8,53 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#008080">
+<meta name="theme-color" content="#f7f6f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
 <style>
-  /* A window on a Windows 95 desktop: grey bevelled chrome around a green
-     card table, with a player along each side, as in the old card games. */
+  /* Plain and flat, in the colours of the other pages, around a green table.
+     The table and the tiles look the same in light and dark mode. The layout is
+     a card table: the opponents along the left, top and right, and you at the bottom. */
   :root {
-    --desk: #008080;
-    --face: #c0c0c0;
-    --hi: #ffffff;
-    --light: #dfdfdf;
-    --shadow: #808080;
-    --dark: #0a0a0a;
-    --title: #000080;
-    --title-end: #1084d0;
-    --felt: #007a1f;
+    --bg: #f7f6f2;            /* the same plain colours as the solfège and piano pages */
+    --panel: #ffffff;
+    --text: #1d1c1a;
+    --muted: #6d6a63;
+    --line: #dedbd3;
+    --accent: #2f5fb3;
+    --accent-soft: #e3ebf9;
+    --accent-text: #ffffff;
+    --yes: #23753a;
+    --no: #b3372f;
+    --no-soft: #f8e0dd;
+    --table: #007a1f;
+    --on-table: #ffffff;
+    --on-table-soft: rgba(255, 255, 255, .82);
+    --tile: #fdfdfb;
+    --tile-line: #b9b5ab;
+    --tile-back: #e6e3da;
+    --tile-mine: #dde9fb;
     --ink0: #1c1c1c;          /* the four tile colours */
     --ink1: #c8141e;
     --ink2: #1646b8;
     --ink3: #e27500;
-    --ui: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, Geneva, "Segoe UI", system-ui, sans-serif;
     --t: clamp(22px, min(3.2vw, 5.2vh), 42px);   /* width of a tile in your rack */
     --tt: calc(var(--t) * .84);                   /* on the table */
     --to: calc(var(--t) * .62);                   /* in an opponent's hand */
-    --raised: inset -1px -1px var(--dark), inset 1px 1px var(--light), inset -2px -2px var(--shadow), inset 2px 2px var(--hi);
-    --button: inset -1px -1px var(--dark), inset 1px 1px var(--hi), inset -2px -2px var(--shadow), inset 2px 2px var(--light);
-    --pressed: inset 1px 1px var(--dark), inset -1px -1px var(--hi), inset 2px 2px var(--shadow), inset -2px -2px var(--light);
-    --sunken: inset 1px 1px var(--shadow), inset -1px -1px var(--hi), inset 2px 2px var(--dark), inset -2px -2px var(--light);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614;
+      --panel: #201f1d;
+      --text: #ebe9e4;
+      --muted: #9a968d;
+      --line: #36342f;
+      --accent: #7aa2ec;
+      --accent-soft: #233150;
+      --accent-text: #10131a;
+      --yes: #6fcf87;
+      --no: #f08a80;
+      --no-soft: #43231f;
+    }
   }
   @media (max-width: 640px) {
     :root { --t: clamp(22px, 7.4vw, 32px); }
@@ -44,118 +65,76 @@
     margin: 0;
     display: flex;
     overflow: hidden;
-    background: var(--desk);
-    color: #000;
-    font: 12px/1.35 var(--ui);
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
-  @media (pointer: coarse) { body { font-size: 13px; } }
   button { font: inherit; color: inherit; }
   [hidden] { display: none !important; }
 
-  /* --- the window chrome --- */
-  .window {
-    display: flex;
-    flex-direction: column;
-    padding: 3px;
-    background: var(--face);
-    box-shadow: var(--raised);
-  }
-  .window.main {
-    width: min(1200px, calc(100vw - 32px));
-    height: min(880px, calc(100dvh - 32px));
-    margin: auto;
-  }
-  @media (max-width: 640px), (max-height: 560px) {
-    .window.main { width: 100vw; height: 100dvh; }
-  }
-  .titlebar {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    min-height: 20px;
-    padding: 1px 2px 1px 3px;
-    background: linear-gradient(90deg, var(--title), var(--title-end));
-    color: #fff;
-    font-weight: bold;
-    user-select: none;
-  }
-  .titlebar .caption { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .titlebar svg { width: 16px; height: 16px; flex: none; }
-  .tbtn {
-    display: grid;
-    place-items: center;
-    width: 16px;
-    height: 14px;
-    padding: 0;
-    border: none;
-    background: var(--face);
-    box-shadow: var(--button);
-    color: #000;
-    font: bold 9px/1 Arial, sans-serif;
-  }
-  .tbtn + .tbtn.close { margin-left: 2px; }
-  .menubar { display: flex; padding: 1px 0 2px; position: relative; user-select: none; }
-  .menubar .mb { padding: 2px 7px; border: none; background: none; cursor: default; }
-  .menubar .mb.open { background: var(--title); color: #fff; }
-  .menubar .spacer { flex: 1; }
-  .menubar .lang { display: flex; gap: 0; margin-right: 2px; }
-  .menubar .lang button { padding: 2px 6px; border: none; background: none; cursor: default; }
-  .menubar .lang button[aria-pressed=true] { box-shadow: var(--sunken); background: var(--light); }
+  /* --- the page around the game --- */
+  .app { display: flex; flex-direction: column; margin: auto; }
+  .topbar { position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 8px; user-select: none; }
+  #menu-button { display: grid; place-items: center; flex: none; width: 34px; height: 30px; padding: 0; border: none; border-radius: 6px; background: none; cursor: pointer; }
+  #menu-button svg { width: 18px; height: 18px; }
+  #menu-button:hover, #menu-button[aria-expanded=true] { background: var(--accent-soft); }
+  #menu-button:focus-visible { outline: 2px solid var(--accent); }
+  .brand { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .spacer { flex: 1; }
+  .topbar .lang { display: flex; flex: none; gap: 2px; }
+  .topbar .lang button { padding: 2px 6px; border: none; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .topbar .lang button[aria-pressed=true] { background: var(--accent-soft); color: var(--text); }
   .menu {
     position: absolute;
     z-index: 30;
     top: 100%;
+    left: 8px;
     min-width: 190px;
-    padding: 2px;
-    background: var(--face);
-    box-shadow: var(--raised);
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
   }
   .menu button {
+    position: relative;
     display: flex;
     justify-content: space-between;
     gap: 28px;
     width: 100%;
-    padding: 3px 18px 3px 20px;
+    padding: 4px 18px 4px 20px;
     border: none;
+    border-radius: 5px;
     background: none;
     text-align: left;
-    cursor: default;
-    position: relative;
+    cursor: pointer;
   }
-  .menu button:hover, .menu button:focus-visible { background: var(--title); color: #fff; outline: none; }
+  .menu button:hover, .menu button:focus-visible { background: var(--accent-soft); outline: none; }
   .menu button[aria-checked=true]::before { content: "•"; position: absolute; left: 8px; font-weight: bold; }
-  .menu hr { margin: 3px 1px; border: none; border-top: 1px solid var(--shadow); border-bottom: 1px solid var(--hi); }
+  .menu hr { margin: 4px 2px; border: none; border-top: 1px solid var(--line); }
 
   .btn {
     min-width: 92px;
-    padding: 4px 10px;
-    border: none;
-    background: var(--face);
-    box-shadow: var(--button);
-    cursor: default;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    cursor: pointer;
     white-space: nowrap;
   }
-  .btn.default { box-shadow: 0 0 0 1px #000, var(--button); }
-  .btn:active:not(:disabled) { box-shadow: var(--pressed); padding: 5px 9px 3px 11px; }
-  .btn.default:active:not(:disabled) { box-shadow: 0 0 0 1px #000, var(--pressed); }
-  .btn:focus-visible { outline: 1px dotted #000; outline-offset: -5px; }
-  .btn:disabled { color: var(--shadow); text-shadow: 1px 1px var(--hi); }
+  .btn:hover:not(:disabled) { border-color: var(--muted); }
+  .btn.default { border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:disabled { color: var(--muted); background: var(--bg); border-color: var(--line); font-weight: 400; cursor: default; }
 
-  .statusbar { display: flex; gap: 2px; padding-top: 2px; }
-  .statusbar > div {
-    min-width: 0;
-    padding: 2px 5px;
-    box-shadow: inset 1px 1px var(--shadow), inset -1px -1px var(--hi);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+  .statusbar { display: flex; gap: 12px; padding: 5px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  .statusbar > div { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #status { flex: 1; }
-  #status.warn { color: #a00000; }
+  #status.warn { color: var(--no); }
+  .app { width: min(1200px, 100vw); height: min(880px, 100dvh); }
 
   /* --- the table: opponents left, top and right, you at the bottom --- */
-  .felt {
+  .tabletop {
     position: relative;
     flex: 1;
     min-height: 0;
@@ -163,9 +142,8 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-rows: auto minmax(0, 1fr) auto;
     padding: 2px;
-    background: var(--felt);
-    box-shadow: var(--sunken);
-    color: #fff;
+    background: var(--table);
+    color: var(--on-table);
   }
   .seat { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 0; padding: 6px; }
   #seat-top { grid-area: 1 / 2 / 2 / 3; flex-direction: column; }
@@ -173,10 +151,10 @@
   #seat-right { grid-area: 1 / 3 / 3 / 4; flex-direction: column; }
   #seat-bottom { grid-area: 3 / 1 / 4 / 4; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 6px 14px; padding: 4px 8px 8px; }
   .who { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 9em; }
-  .who .name { padding: 0 4px; font-weight: bold; text-shadow: 1px 1px 0 rgba(0, 0, 0, .45); }
-  .seat.active .who .name { background: var(--title); text-shadow: none; outline: 1px dotted #fff; }
-  .who .count { font-size: 11px; opacity: .85; }
-  .said { min-height: 1.35em; font-size: 11px; color: #fff59a; text-align: center; max-width: 11em; }
+  .who .name { padding: 0 6px; border-radius: 6px; font-weight: 600; }
+  .seat.active .who .name { background: var(--accent); color: var(--accent-text); }
+  .who .count { font-size: 12px; color: var(--on-table-soft); }
+  .said { min-height: 1.35em; font-size: 12px; color: var(--on-table-soft); text-align: center; max-width: 11em; }
   #seat-top .said { max-width: none; }
   .hand { position: relative; --w: var(--to); }
   .hand.h { width: 100%; height: calc(var(--to) * 1.36); }
@@ -204,7 +182,7 @@
     border-radius: 6px;
     background: rgba(0, 0, 0, .16);
   }
-  .set.bad { border-color: #ff6a5c; background: rgba(150, 0, 0, .4); }
+  .set.bad { border-color: #ff6a5c; background: rgba(150, 0, 0, .45); }
   .set.locked { opacity: .82; }
   .newset {
     display: grid;
@@ -212,13 +190,13 @@
     min-width: calc(var(--tt) * 3.4);
     min-height: calc(var(--tt) * 1.36 + 10px);
     padding: 0 8px;
-    border: 1px dashed rgba(255, 255, 255, .55);
+    border: 1px dashed var(--on-table-soft);
     border-radius: 6px;
-    color: rgba(255, 255, 255, .8);
-    font-size: 11px;
+    color: var(--on-table-soft);
+    font-size: 12px;
   }
-  .set.over, .newset.over, #rack.over { outline: 2px dashed #fff59a; outline-offset: 2px; }
-  .empty-table { align-self: center; margin: auto; color: rgba(255, 255, 255, .6); text-align: center; }
+  .set.over, .newset.over, #rack.over { outline: 2px dashed var(--on-table); outline-offset: 2px; }
+  .empty-table { align-self: center; margin: auto; color: var(--on-table-soft); text-align: center; }
 
   .mine { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; }
   .mine .who { flex-direction: row; gap: 8px; max-width: none; }
@@ -229,21 +207,21 @@
     justify-content: center;
     align-content: flex-start;
     gap: 3px;
-    width: min(100%, calc((var(--t) + 3px) * 15 + 12px));
-    max-height: calc((var(--t) * 1.36 + 3px) * 3 + 12px);
-    min-height: calc(var(--t) * 1.36 + 12px);
+    width: min(100%, calc((var(--t) + 3px) * 15 + 14px));
+    max-height: calc((var(--t) * 1.36 + 3px) * 3 + 14px);
+    min-height: calc(var(--t) * 1.36 + 14px);
     padding: 6px;
     overflow-y: auto;
-    border-radius: 4px;
-    background: rgba(0, 0, 0, .25);
-    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .5);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, .2);
   }
-  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; color: #000; }
+  /* The buttons are on the table but keep the page's colours, for their own text too. */
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; color: var(--text); }
   .controls .wide { grid-column: span 2; }
   @media (max-width: 640px) {
     .controls { grid-template-columns: repeat(4, auto); }
     .controls .wide { grid-column: auto; }
-    .controls .btn { min-width: 0; padding: 4px 7px; }
+    .controls .btn { min-width: 0; padding: 4px 6px; font-size: 13px; line-height: 1.15; white-space: normal; }
     .seat { padding: 4px 3px; }
     #table { gap: 8px 10px; padding: 8px 4px; }
   }
@@ -259,10 +237,10 @@
     width: var(--w);
     height: calc(var(--w) * 1.36);
     border-radius: calc(var(--w) * .14);
-    background: linear-gradient(160deg, #fffef9, #f4ecd4 65%, #e6dab6);
-    box-shadow: inset 0 0 0 1px rgba(90, 70, 30, .4), inset -1px -2px 0 rgba(120, 95, 40, .28), 1px 2px 2px rgba(0, 0, 0, .45);
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1px var(--tile-line);
     color: var(--ink);
-    font: 800 calc(var(--w) * .56)/1 "Arial Black", "Arial Bold", Arial, sans-serif;
+    font: 700 calc(var(--w) * .56)/1 system-ui, -apple-system, "Segoe UI", sans-serif;
     letter-spacing: -.04em;
     user-select: none;
     -webkit-user-select: none;
@@ -273,59 +251,65 @@
   .tile.k3 { --ink: var(--ink3); }
   .tile svg { width: 74%; height: auto; }
   .tile .rep { position: absolute; right: 7%; bottom: 4%; font-size: 36%; opacity: .75; }
-  .tile.back { background: linear-gradient(160deg, #f7f0da, #e4d7ae); }
-  .tile.mine { background: linear-gradient(160deg, #fbfdff, #dde9fb 70%, #c9daf3); }
-  .tile.recent { box-shadow: 0 0 0 2px #ffd400, 1px 2px 3px rgba(0, 0, 0, .5); }
-  .tile.new { box-shadow: 0 0 0 2px #8cf58c, 1px 2px 3px rgba(0, 0, 0, .5); }
-  .tile.sel { transform: translateY(-5px); box-shadow: 0 0 0 2px #fff59a, 1px 5px 4px rgba(0, 0, 0, .5); }
+  .tile.back { background: var(--tile-back); }
+  .tile.mine { background: var(--tile-mine); }
+  .tile.recent { box-shadow: 0 0 0 2px #ffd400; }
+  .tile.new { box-shadow: 0 0 0 2px #8cf58c; }
+  .tile.sel { transform: translateY(-5px); box-shadow: 0 0 0 2px #ffffff; }
   .tile.can { cursor: grab; }
   .tile.dragging { opacity: .25; }
   .ghost { position: fixed; z-index: 50; display: flex; gap: 2px; pointer-events: none; --w: var(--t); }
-  .ghost .tile { box-shadow: inset 0 0 0 1px rgba(90, 70, 30, .4), 3px 7px 9px rgba(0, 0, 0, .45); transform: none; }
+  .ghost .tile { box-shadow: inset 0 0 0 1px var(--tile-line), 0 3px 8px rgba(0, 0, 0, .3); transform: none; }
 
   /* --- dialogs --- */
   .layer { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 12px; }
-  .dialog { width: min(460px, 100%); max-height: calc(100dvh - 24px); }
+  .dialog {
+    display: flex;
+    flex-direction: column;
+    width: min(460px, 100%);
+    max-height: calc(100dvh - 24px);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .18);
+  }
   .dialog.wide { width: min(620px, 100%); }
-  .dialog .body { padding: 12px 12px 4px; overflow: auto; }
+  .dialog .head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; font-weight: 600; }
+  .dialog .caption { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dialog .close { padding: 0 6px; border: none; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .dialog .close:hover { background: var(--accent-soft); }
+  .dialog .body { padding: 10px 12px 4px; overflow: auto; }
   .dialog .body p { margin: 0 0 10px; }
   .dialog .body h3 { margin: 12px 0 4px; font-size: 1em; }
   .dialog .body ul { margin: 0 0 8px; padding-left: 18px; }
-  .dialog .buttons { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 12px 10px; }
-  .msg { display: flex; gap: 12px; align-items: flex-start; }
-  .msg svg { flex: none; width: 32px; height: 32px; }
-  fieldset { margin: 0 0 10px; padding: 6px 10px 8px; border: none; box-shadow: inset -1px -1px var(--hi), inset 1px 1px var(--shadow), inset -2px -2px var(--shadow), inset 2px 2px var(--hi); }
-  /* The frame is a shadow, which a legend can't interrupt as it does a border;
-     so the legend covers it, as the title of a Windows 95 group box does. */
-  legend { padding: 0 3px; background: var(--face); }
+  .dialog .buttons { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 12px 12px; }
+  fieldset { margin: 0 0 10px; padding: 6px 10px 8px; border: 1px solid var(--line); border-radius: 8px; }
+  legend { padding: 0 4px; color: var(--muted); }
   fieldset label { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
-  fieldset .note { margin: 4px 0 0; color: #333; font-size: 11px; }
-  .sheet { width: 100%; border-collapse: collapse; background: #fff; box-shadow: var(--sunken); }
+  fieldset .note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .sheet { width: 100%; border-collapse: collapse; }
   .sheet th, .sheet td { padding: 3px 8px; text-align: right; white-space: nowrap; }
   .sheet th:first-child, .sheet td:first-child { text-align: left; }
-  .sheet thead th { border-bottom: 1px solid var(--shadow); }
-  .sheet tfoot td { border-top: 1px solid var(--shadow); font-weight: bold; }
-  .sheet .win { color: #006000; }
-  .sheet .neg { color: #a00000; }
-  .result { margin-bottom: 10px; font-weight: bold; }
+  .sheet thead th { border-bottom: 1px solid var(--line); }
+  .sheet tfoot td { border-top: 1px solid var(--line); font-weight: 600; }
+  .sheet .win { color: var(--yes); }
+  .sheet .neg { color: var(--no); }
+  .result { margin-bottom: 10px; font-weight: 600; }
 </style>
 </head>
 <body>
-<div class="window main" id="app">
-  <div class="titlebar">
-    <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="12" rx="1.5" fill="#fffbe8" stroke="#000"/><rect x="5.5" y="2.5" width="9" height="12" rx="1.5" fill="#fffbe8" stroke="#000"/><text x="10" y="12" font-size="8" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#c8141e">7</text></svg>
-    <span class="caption">Tile Rummy</span>
-    <span class="tbtn" aria-hidden="true">_</span><span class="tbtn" aria-hidden="true">□</span><span class="tbtn close" aria-hidden="true">✕</span>
-  </div>
-  <nav class="menubar" id="menubar">
-    <button type="button" class="mb" data-menu="game" data-t="menuGame"></button>
-    <button type="button" class="mb" data-menu="help" data-t="menuHelp"></button>
+<div class="app" id="app">
+  <header class="topbar">
+    <button type="button" id="menu-button" aria-label="Menu" title="Menu" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">
+      <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <span class="brand">Tile Rummy</span>
     <span class="spacer"></span>
     <span class="lang" role="group" aria-label="Taal / Language">
       <button type="button" data-lang="nl" lang="nl" title="Nederlands">NL</button>
       <button type="button" data-lang="en" lang="en" title="English">EN</button>
     </span>
-    <div class="menu" id="menu-game" role="menu" hidden>
+    <div class="menu" id="menu" role="menu" aria-label="Menu" hidden>
       <button type="button" role="menuitem" data-act="new"><span data-t="newGame"></span><span>F2</span></button>
       <hr>
       <button type="button" role="menuitemradio" data-act="opp" data-n="1"><span data-t="opp1"></span></button>
@@ -334,14 +318,12 @@
       <hr>
       <button type="button" role="menuitem" data-act="scores"><span data-t="scores"></span></button>
       <button type="button" role="menuitem" data-act="options"><span data-t="options"></span></button>
-    </div>
-    <div class="menu" id="menu-help" role="menu" hidden>
-      <button type="button" role="menuitem" data-act="rules"><span data-t="rules"></span><span>F1</span></button>
       <hr>
+      <button type="button" role="menuitem" data-act="rules"><span data-t="rules"></span><span>F1</span></button>
       <button type="button" role="menuitem" data-act="about"><span data-t="about"></span></button>
     </div>
-  </nav>
-  <div class="felt" id="felt">
+  </header>
+  <div class="tabletop" id="tabletop">
     <div class="seat" id="seat-left" hidden><div class="who"><span class="name"></span><span class="count"></span></div><div class="hand v"></div><div class="said"></div></div>
     <div class="seat" id="seat-top" hidden><div class="hand h"></div><div class="who"><span class="name"></span><span class="count"></span></div><div class="said"></div></div>
     <div class="seat" id="seat-right" hidden><div class="who"><span class="name"></span><span class="count"></span></div><div class="hand v"></div><div class="said"></div></div>
@@ -413,7 +395,7 @@ const RULES_NL = `
 <h3>Het einde</h3>
 <p>Wie uit is, wint het spel. De anderen tellen de stenen op hun plankje als minpunten (een joker is 30); de winnaar krijgt ze samen als pluspunten. Is de pot leeg en kan niemand meer, dan wint wie het minst overhoudt; de anderen krijgen het verschil met de winnaar als minpunten.</p>
 <h3>Tijd</h3>
-<p>Met <i>Eén minuut per beurt</i> aan (in Spel → Opties) heb je een minuut. Ben je dan niet klaar, dan pak je een steen; had je al geschoven, dan gaat alles terug en pak je er drie.</p>
+<p>Met <i>Eén minuut per beurt</i> aan (in Menu → Opties) heb je een minuut. Ben je dan niet klaar, dan pak je een steen; had je al geschoven, dan gaat alles terug en pak je er drie.</p>
 <h3>Zo speel je hier</h3>
 <p>Sleep stenen van je plankje naar de tafel: op een reeks om aan te leggen, of naar het lege vak om een nieuwe te beginnen. Tik stenen aan om er meer tegelijk te slepen, of tik daarna op een reeks of het lege vak om ze erheen te leggen. Wat nog geen geldige reeks is, kleurt rood. Een steen die je deze beurt hebt gelegd, kun je terugslepen naar je plankje; <i>Terugzetten</i> zet alles terug zoals het aan het begin van je beurt lag. Stenen die een tegenstander net legde, zijn geel omrand.</p>`;
 
@@ -436,13 +418,12 @@ const RULES_EN = `
 <h3>The end</h3>
 <p>Whoever goes out wins the game. The others count the tiles on their rack as minus points (a joker is 30); the winner gets their total as plus points. If the pool is empty and nobody can play, whoever has the least left wins; the others score the difference with the winner as minus points.</p>
 <h3>Time</h3>
-<p>With <i>One minute per turn</i> on (in Game → Options) you have a minute. If you're not done by then, you draw a tile; if you had moved tiles, everything goes back and you draw three.</p>
+<p>With <i>One minute per turn</i> on (in Menu → Options) you have a minute. If you're not done by then, you draw a tile; if you had moved tiles, everything goes back and you draw three.</p>
 <h3>Playing here</h3>
 <p>Drag tiles from your rack to the table: onto a set to add to it, or to the empty box to start a new one. Tap tiles to drag several at once, or tap a set or the empty box afterwards to put them there. Anything that isn't a valid set yet turns red. A tile you laid down this turn can be dragged back to your rack; <i>Undo</i> puts everything back as it was at the start of your turn. Tiles an opponent just played have a yellow edge.</p>`;
 
 const STRINGS = {
   nl: {
-    menuGame: "Spel", menuHelp: "Help",
     newGame: "Nieuw spel", opp1: "Eén tegenstander", opp2: "Twee tegenstanders", opp3: "Drie tegenstanders",
     scores: "Scores...", options: "Opties...", rules: "Spelregels", about: "Over Tile Rummy",
     you: "Jij",
@@ -489,7 +470,6 @@ const STRINGS = {
     rulesHtml: RULES_NL,
   },
   en: {
-    menuGame: "Game", menuHelp: "Help",
     newGame: "New game", opp1: "One opponent", opp2: "Two opponents", opp3: "Three opponents",
     scores: "Scores...", options: "Options...", rules: "Rules", about: "About Tile Rummy",
     you: "You",
@@ -1099,8 +1079,8 @@ function indexAt(box, x, y, ids) {
   return i < 0 ? tiles.length : i;
 }
 
-const felt = $("#felt");
-felt.addEventListener("pointerdown", e => {
+const tabletop = $("#tabletop");
+tabletop.addEventListener("pointerdown", e => {
   if (e.button !== 0 || !game || !$("#layer").hidden) return;
   const tile = e.target.closest(".tile[data-id]");
   if (!tile || !tile.closest("#rack, #table")) return;
@@ -1170,7 +1150,7 @@ function toggleSelected(id) {
 }
 
 // A tap next to the tiles: put the selected tiles there, or else let go of them.
-felt.addEventListener("click", e => {
+tabletop.addEventListener("click", e => {
   if (!game || e.target.closest(".tile")) return;
   if (!ui.selected.size) return;
   const ids = [...document.querySelectorAll(".tile.sel")].map(el => Number(el.dataset.id)).filter(canMove);
@@ -1185,16 +1165,15 @@ felt.addEventListener("click", e => {
 
 // --- dialogs and menus ---------------------------------------------------------------
 
-const WARNING = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 31 29H1z" fill="#ffd400" stroke="#000"/><rect x="14.5" y="10" width="3" height="11" fill="#000"/><rect x="14.5" y="23" width="3" height="3" fill="#000"/></svg>`;
 
 let onEscape = null;
 function dialog(title, body, buttons, wide = false) {
   const layer = $("#layer");
   const box = document.createElement("div");
-  box.className = "window dialog" + (wide ? " wide" : "");
+  box.className = "dialog" + (wide ? " wide" : "");
   box.setAttribute("role", "dialog");
   box.setAttribute("aria-modal", "true");
-  box.innerHTML = `<div class="titlebar"><span class="caption"></span><button type="button" class="tbtn close" aria-label="${t("close")}">✕</button></div><div class="body"></div><div class="buttons"></div>`;
+  box.innerHTML = `<div class="head"><span class="caption"></span><button type="button" class="close" aria-label="${t("close")}">✕</button></div><div class="body"></div><div class="buttons"></div>`;
   box.querySelector(".caption").textContent = title;
   const content = box.querySelector(".body");
   if (typeof body === "string") content.innerHTML = body; else content.append(body);
@@ -1209,7 +1188,7 @@ function dialog(title, body, buttons, wide = false) {
   }
   const cancel = buttons.find(b => b.cancel) ?? buttons[buttons.length - 1];
   onEscape = () => { closeDialog(); cancel.action?.(); };
-  box.querySelector(".tbtn").addEventListener("click", onEscape);
+  box.querySelector(".close").addEventListener("click", onEscape);
   layer.replaceChildren(box);
   layer.hidden = false;
   (row.querySelector(".default") ?? row.firstChild)?.focus();
@@ -1220,8 +1199,8 @@ function closeDialog() {
   onEscape = null;
 }
 function message(text) {
-  dialog("Tile Rummy", `<div class="msg">${WARNING}<p></p></div>`, [{label: t("ok"), default: true}]);
-  $("#layer .msg p").textContent = text;
+  dialog("Tile Rummy", "<p></p>", [{label: t("ok"), default: true}]);
+  $("#layer .body p").textContent = text;
 }
 
 function showScores(result) {
@@ -1297,25 +1276,30 @@ function setOpponents(n) {
 // New game, from the menu or F2: ask first if there are scores to lose.
 function askNewGame(then = () => newGame(true)) {
   if (!sheet.length && (!game || game.over || !game.players.some(p => p.melded))) { then(); return; }
-  dialog("Tile Rummy", `<div class="msg">${WARNING}<p>${t("newGameAsk")}</p></div>`,
+  dialog("Tile Rummy", `<p>${t("newGameAsk")}</p>`,
          [{label: t("yes"), default: true, action: then}, {label: t("no"), cancel: true}]);
 }
 
-function openMenu(name) {
-  for (const b of document.querySelectorAll(".menubar .mb")) b.classList.toggle("open", b.dataset.menu === name);
-  for (const m of document.querySelectorAll(".menu")) {
-    const open = m.id === `menu-${name}`;
-    m.hidden = !open;
-    if (open) m.style.left = `${document.querySelector(`.mb[data-menu=${name}]`).offsetLeft}px`;
-  }
-  ui.menu = name;
+function openMenu() {
+  ui.menu = true;
+  $("#menu").hidden = false;
+  $("#menu-button").setAttribute("aria-expanded", "true");
+  $("#menu button").focus();
 }
-function closeMenu() { if (ui.menu) openMenu(null); ui.menu = null; }
-
-for (const b of document.querySelectorAll(".menubar .mb")) {
-  b.addEventListener("click", e => { e.stopPropagation(); ui.menu === b.dataset.menu ? closeMenu() : openMenu(b.dataset.menu); });
-  b.addEventListener("pointerenter", () => { if (ui.menu && ui.menu !== b.dataset.menu) openMenu(b.dataset.menu); });
+function closeMenu() {
+  ui.menu = false;
+  $("#menu").hidden = true;
+  $("#menu-button").setAttribute("aria-expanded", "false");
 }
+$("#menu-button").addEventListener("click", e => { e.stopPropagation(); ui.menu ? closeMenu() : openMenu(); });
+// The arrow keys go through the menu, as in any menu.
+$("#menu").addEventListener("keydown", e => {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  e.preventDefault();
+  e.stopPropagation();
+  const items = [...$("#menu").querySelectorAll("button")];
+  items[(items.indexOf(document.activeElement) + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+});
 addEventListener("click", e => { if (ui.menu && !e.target.closest(".menu")) closeMenu(); });
 for (const item of document.querySelectorAll(".menu [data-act]")) {
   item.addEventListener("click", () => {
@@ -1332,7 +1316,7 @@ for (const item of document.querySelectorAll(".menu [data-act]")) {
 
 addEventListener("keydown", e => {
   if (e.key === "Escape") {
-    if (onEscape) onEscape(); else if (ui.menu) closeMenu();
+    if (onEscape) onEscape(); else if (ui.menu) { closeMenu(); $("#menu-button").focus(); }
     else if (myTurn() && ui.selected.size) { ui.selected.clear(); render(); }
     return;
   }
