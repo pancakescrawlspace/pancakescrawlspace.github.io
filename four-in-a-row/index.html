@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vier op een rij</title>
+<!-- Installing it as an app, and the icons; sw.js keeps it for offline use. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#f7f6f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
+<style>
+  /* Plain and flat, in the colours of the other pages, with a plate that the
+     discs fall behind. The discs keep their orange and blue. */
+  :root {
+    --bg: #f7f6f2;            /* the same plain colours as the solfège and piano pages */
+    --panel: #ffffff;
+    --text: #1d1c1a;
+    --muted: #6d6a63;
+    --line: #dedbd3;
+    --accent: #2f5fb3;
+    --accent-soft: #e3ebf9;
+    --accent-text: #ffffff;
+    --yes: #23753a;
+    --no: #b3372f;
+    --no-soft: #f8e0dd;
+    --plate: #dedbd3;
+    --seat0: #e27500;         /* orange and blue: easy to tell apart, also for people who don't see red and green */
+    --seat1: #1646b8;
+    /* The width of a cell: seven across, and six down plus the row above the
+       board, inside what the menu, the players and the button leave free. */
+    --c: clamp(30px, min((100vw - 16px) / 7, (100dvh - 200px) / 7), 84px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614;
+      --panel: #201f1d;
+      --text: #ebe9e4;
+      --muted: #9a968d;
+      --line: #36342f;
+      --accent: #7aa2ec;
+      --accent-soft: #233150;
+      --accent-text: #10131a;
+      --yes: #6fcf87;
+      --no: #f08a80;
+      --no-soft: #43231f;
+      --plate: #4a4741;
+    }
+  }
+  /* Too low for the players above and the button below: they go beside the board. */
+  @media (max-height: 460px) and (min-width: 480px) {
+    :root { --c: clamp(26px, min((100vw - 190px) / 7, (100dvh - 80px) / 7), 84px); }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: flex;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* --- the page around the game --- */
+  .app { display: flex; flex-direction: column; margin: auto; }
+  .topbar { position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 8px; user-select: none; }
+  #menu-button { display: grid; place-items: center; flex: none; width: 34px; height: 30px; padding: 0; border: none; border-radius: 6px; background: none; cursor: pointer; }
+  #menu-button svg { width: 18px; height: 18px; }
+  #menu-button:hover, #menu-button[aria-expanded=true] { background: var(--accent-soft); }
+  #menu-button:focus-visible { outline: 2px solid var(--accent); }
+  .brand { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .spacer { flex: 1; }
+  .topbar .lang { display: flex; flex: none; gap: 2px; }
+  .topbar .lang button { padding: 2px 6px; border: none; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .topbar .lang button[aria-pressed=true] { background: var(--accent-soft); color: var(--text); }
+  .menu {
+    position: absolute;
+    z-index: 30;
+    top: 100%;
+    left: 8px;
+    min-width: 190px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .menu button {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    gap: 28px;
+    width: 100%;
+    padding: 4px 18px 4px 20px;
+    border: none;
+    border-radius: 5px;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+  }
+  .menu button:hover, .menu button:focus-visible { background: var(--accent-soft); outline: none; }
+  .menu button[aria-checked=true]::before { content: "•"; position: absolute; left: 8px; font-weight: bold; }
+  .menu hr { margin: 4px 2px; border: none; border-top: 1px solid var(--line); }
+
+  .btn {
+    min-width: 92px;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--muted); }
+  .btn.default { border-color: var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  .statusbar { display: flex; gap: 12px; padding: 5px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  .statusbar > div { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #status { flex: 1; }
+  .app { width: min(760px, 100vw); height: min(820px, 100dvh); }
+
+  /* --- the table --- */
+  .tabletop {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+    border-top: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .players {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    width: calc(var(--c) * 7);
+    max-width: 100%;
+  }
+  .who { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 2px 4px; }
+  .who .name { padding: 0 6px; border-radius: 6px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .who.active .name { background: var(--accent); color: var(--accent-text); }
+  .who .wins { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .chip { flex: none; width: 14px; height: 14px; border-radius: 50%; }
+  .s0 { background-color: var(--seat0); }
+  .s1 { background-color: var(--seat1); }
+
+  #said { min-height: 1.4em; color: var(--muted); text-align: center; }
+
+  /* The board, from back to front: the discs, the plate with round holes cut out
+     of it, and over it all a button per column. Its top row, without a plate,
+     is where a disc waits before it falls. */
+  #board {
+    position: relative;
+    flex: none;
+    width: calc(var(--c) * 7);
+    height: calc(var(--c) * 7);
+  }
+  #discs { position: absolute; inset: 0; }
+  .plate {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--c) * 6);
+    background: var(--plate);
+    --holes: radial-gradient(circle at center, transparent calc(var(--c) * .4), #000 calc(var(--c) * .4 + .5px)) 0 0 / var(--c) var(--c);
+    -webkit-mask: var(--holes);
+    mask: var(--holes);
+  }
+  .disc {
+    position: absolute;
+    left: calc(var(--x) * var(--c) + var(--c) * .08);
+    bottom: calc(var(--y) * var(--c) + var(--c) * .08);
+    width: calc(var(--c) * .84);
+    height: calc(var(--c) * .84);
+    border-radius: 50%;
+  }
+  .disc.falling { animation: fall var(--time) cubic-bezier(.45, 0, 1, .7) both; }
+  @keyframes fall {
+    from { transform: translateY(calc(var(--fall) * var(--c) * -1)); }
+    to { transform: none; }
+  }
+  /* The last move has a small mark; the winning line a white ring. */
+  .disc.last::after {
+    content: "";
+    position: absolute;
+    inset: 38%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .9);
+  }
+  #board.won .disc:not(.win) { opacity: .55; }
+  .disc.win { box-shadow: inset 0 0 0 calc(var(--c) * .07) #fff; }
+  #cols { position: absolute; inset: 0; display: flex; }
+  .col {
+    position: relative;
+    flex: 1;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: default;
+    touch-action: manipulation;
+  }
+  .col:focus { outline: none; }
+  .col .hint {
+    position: absolute;
+    left: 8%;
+    top: calc(var(--c) * .08);
+    width: 84%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    opacity: 0;
+  }
+  #board.myturn .col[aria-disabled=false] { cursor: pointer; }
+  @media (hover: hover) {
+    #board.myturn .col[aria-disabled=false]:hover { background: rgba(127, 127, 127, .12); }
+    #board.myturn .col[aria-disabled=false]:hover .hint { opacity: .6; }
+  }
+  #board.myturn .col[aria-disabled=false]:focus-visible { background: rgba(127, 127, 127, .12); outline: 2px solid var(--accent); outline-offset: -2px; }
+  #board.myturn .col[aria-disabled=false]:focus-visible .hint { opacity: .6; }
+
+  /* The players and their message above the board, and the button below it;
+     beside it instead when the window is too low (see further down). */
+  .side { display: contents; }
+  #board { order: 1; }
+  .controls { order: 2; display: flex; gap: 6px; }
+  @media (max-height: 460px) and (min-width: 480px) {
+    .tabletop { flex-direction: row-reverse; gap: 12px; }
+    .side { display: flex; flex-direction: column; justify-content: center; gap: 8px; width: 150px; flex: none; }
+    .players { flex-direction: column; width: auto; }
+    #said { font-size: 12px; min-height: 3em; }
+    .controls { justify-content: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .disc.falling { animation: none; }
+  }
+  .test .disc.falling { animation: none; }
+
+  /* --- dialogs --- */
+  .layer { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 12px; }
+  .dialog {
+    display: flex;
+    flex-direction: column;
+    width: min(460px, 100%);
+    max-height: calc(100dvh - 24px);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .18);
+  }
+  .dialog.wide { width: min(620px, 100%); }
+  .dialog .head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 0; font-weight: 600; }
+  .dialog .caption { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .dialog .close { padding: 0 6px; border: none; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+  .dialog .close:hover { background: var(--accent-soft); }
+  .dialog .body { padding: 10px 12px 4px; overflow: auto; }
+  .dialog .body p { margin: 0 0 10px; }
+  .dialog .body h3 { margin: 12px 0 4px; font-size: 1em; }
+  .dialog .body ul { margin: 0 0 8px; padding-left: 18px; }
+  .dialog .buttons { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 12px 12px; }
+  fieldset { margin: 0 0 10px; padding: 6px 10px 8px; border: 1px solid var(--line); border-radius: 8px; }
+  legend { padding: 0 4px; color: var(--muted); }
+  fieldset label { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
+  fieldset .note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <button type="button" id="menu-button" aria-label="Menu" title="Menu" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">
+      <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+    <span class="brand" data-t="title"></span>
+    <span class="spacer"></span>
+    <span class="lang" role="group" aria-label="Taal / Language">
+      <button type="button" data-lang="nl" lang="nl" title="Nederlands">NL</button>
+      <button type="button" data-lang="en" lang="en" title="English">EN</button>
+    </span>
+    <div class="menu" id="menu" role="menu" aria-label="Menu" hidden>
+      <button type="button" role="menuitem" data-act="new"><span data-t="newGame"></span><span>F2</span></button>
+      <button type="button" role="menuitem" data-act="clear"><span data-t="clearScore"></span></button>
+      <hr>
+      <button type="button" role="menuitem" data-act="options"><span data-t="options"></span></button>
+      <hr>
+      <button type="button" role="menuitem" data-act="rules"><span data-t="rules"></span><span>F1</span></button>
+      <button type="button" role="menuitem" data-act="about"><span data-t="about"></span></button>
+    </div>
+  </header>
+  <div class="tabletop" id="tabletop">
+    <div class="side">
+      <div class="players">
+        <div class="who" id="seat-0"><span class="chip s0"></span><span class="name"></span><span class="wins"></span></div>
+        <div class="who" id="seat-1"><span class="chip s1"></span><span class="name"></span><span class="wins"></span></div>
+      </div>
+      <div id="said" role="status"></div>
+      <div class="controls"><button type="button" class="btn" id="again" data-t="newGame"></button></div>
+    </div>
+    <div id="board">
+      <div id="discs"></div>
+      <div class="plate"></div>
+      <div id="cols"></div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <div id="status"></div>
+    <div id="level"></div>
+    <div id="draws"></div>
+  </div>
+</div>
+<div class="layer" id="layer" hidden></div>
+
+<script src="rules.js"></script>
+<script src="ai.js"></script>
+<script src="room.js"></script>
+<script>
+"use strict";
+
+// The rules are in rules.js, the computer player in ai.js, and the record of the
+// game in room.js. This page only draws the record it is given, and writes a new
+// one when someone plays; it never changes a game in any other way. So nothing
+// here depends on where a move comes from, or who sits in the other seat.
+
+const $ = sel => document.querySelector(sel);
+const params = new URLSearchParams(location.search);
+// ?test is for test/index.html: no waiting or animation, and nothing kept between
+// visits unless with &keep. It can also set up a game: &moves=3,3,4 the moves
+// so far, &first=1 who started them, &opponent=person a person elsewhere in the
+// other seat, and &delay=200 a room as slow as a network.
+const TEST = params.has("test");
+const KEEP = !TEST || params.has("keep");
+const THINK = TEST ? 0 : 500;                 // the shortest time the computer seems to think
+const HARD_BUDGET = TEST ? 50 : 1000;         // how long the hard level really thinks, in milliseconds
+const STORE = TEST ? "connect4.test." : "connect4.";   // so the tests leave a real game alone
+if (TEST) document.documentElement.classList.add("test");
+
+// --- languages ---------------------------------------------------------------
+
+const RULES_NL = `
+<p>Om de beurt laat je een schijf in een kolom vallen; hij zakt naar het laagste vrije vak. Wie als eerste vier eigen schijven op een rij heeft, wint: horizontaal, verticaal of diagonaal. Is het bord vol zonder vier op een rij, dan is het gelijkspel.</p>
+<h3>Zo speel je hier</h3>
+<ul>
+<li>Klik of tik op een kolom om daar je schijf te laten vallen.</li>
+<li>Met het toetsenbord: de cijfers 1 tot en met 7 kiezen een kolom; of ga met de pijltjes naar een kolom en druk op Enter.</li>
+<li>De laatste zet heeft een stipje in de schijf.</li>
+</ul>
+<p>In <i>Menu → Opties</i> kies je hoe sterk de computer speelt en wie er begint. Oranje is altijd jij, blauw de computer.</p>`;
+
+const RULES_EN = `
+<p>Take turns dropping a disc into a column; it falls to the lowest free cell. The first player with four of their discs in a row wins: across, up or diagonally. If the board fills up without four in a row, it is a draw.</p>
+<h3>Playing here</h3>
+<ul>
+<li>Click or tap a column to drop your disc there.</li>
+<li>With the keyboard: the digits 1 to 7 choose a column; or go to a column with the arrow keys and press Enter.</li>
+<li>The last move has a dot in its disc.</li>
+</ul>
+<p>In <i>Menu → Options</i> you choose how strongly the computer plays and who starts. Orange is always you, and blue the computer.</p>`;
+
+const STRINGS = {
+  nl: {
+    title: "Vier op een rij", newGame: "Nieuw spel", clearScore: "Score op nul",
+    options: "Opties...", rules: "Spelregels", about: "Over Vier op een rij...", ok: "OK", cancel: "Annuleren", close: "Sluiten",
+    you: "Jij", computer: "Computer", opponent: "Tegenstander", yes: "Ja", no: "Nee",
+    yourTurn: "Jij bent aan de beurt: kies een kolom.", thinking: "De computer denkt na...", waiting: name => `Wachten op ${name}...`,
+    youWon: "Jij hebt gewonnen!", youLost: "De computer heeft gewonnen.", otherWon: name => `${name} heeft gewonnen.`, draw: "Gelijkspel: het bord is vol.",
+    afterGame: "Begin een nieuw spel wanneer je wilt.", waitNext: name => `${name} begint het volgende spel.`,
+    level: "Niveau", easy: "Makkelijk", medium: "Gemiddeld", hard: "Moeilijk",
+    levelNote: "Een nieuw niveau geldt vanaf de volgende zet.",
+    starts: "Wie begint", startsTurns: "Om de beurt", startsYou: "Altijd jij", startsComputer: "Altijd de computer", language: "Taal",
+    draws: n => `Gelijk: ${n}`, column: n => `Kolom ${n}`, columnFull: n => `Kolom ${n} (vol)`,
+    giveUp: "Dit spel stoppen en een nieuw beginnen? Het telt niet mee voor de score.",
+    refused: "Die zet klopt niet met de regels van het spel, of kwam op het verkeerde moment.",
+    notAccepted: "Die zet kon niet worden doorgegeven. Probeer het nog eens.",
+    aboutHtml: `<p><b>Vier op een rij</b></p><p>Twee spelers, zeven kolommen, zes rijen. De computer rekent zijn zetten uit in de achtergrond, en op <i>Moeilijk</i> kijkt hij zo ver vooruit als hij in een seconde kan.</p>`,
+    rulesHtml: RULES_NL,
+  },
+  en: {
+    title: "Four in a Row", newGame: "New game", clearScore: "Clear the score",
+    options: "Options...", rules: "Rules", about: "About Four in a Row...", ok: "OK", cancel: "Cancel", close: "Close",
+    you: "You", computer: "Computer", opponent: "Opponent", yes: "Yes", no: "No",
+    yourTurn: "Your turn: choose a column.", thinking: "The computer is thinking...", waiting: name => `Waiting for ${name}...`,
+    youWon: "You won!", youLost: "The computer won.", otherWon: name => `${name} won.`, draw: "A draw: the board is full.",
+    afterGame: "Start a new game whenever you like.", waitNext: name => `${name} starts the next game.`,
+    level: "Level", easy: "Easy", medium: "Medium", hard: "Hard",
+    levelNote: "A new level applies from the next move on.",
+    starts: "Who starts", startsTurns: "Taking turns", startsYou: "Always you", startsComputer: "Always the computer", language: "Language",
+    draws: n => `Draws: ${n}`, column: n => `Column ${n}`, columnFull: n => `Column ${n} (full)`,
+    giveUp: "Stop this game and start a new one? It won't count for the score.",
+    refused: "That move doesn't fit the rules of the game, or came at the wrong moment.",
+    notAccepted: "That move couldn't be passed on. Please try again.",
+    aboutHtml: `<p><b>Four in a Row</b></p><p>Two players, seven columns, six rows. The computer works out its moves in the background, and on <i>Hard</i> it looks as far ahead as it can in a second.</p>`,
+    rulesHtml: RULES_EN,
+  },
+};
+let lang = "nl";
+try {
+  const saved = KEEP && localStorage.getItem("solfege.lang");     // shared with the other pages on the site
+  if (saved && Object.hasOwn(STRINGS, saved)) lang = saved;
+} catch {}
+const t = (key, ...args) => {
+  const text = STRINGS[lang][key];
+  return typeof text === "function" ? text(...args) : text;
+};
+
+// --- settings ----------------------------------------------------------------
+
+const settings = {level: "medium", starts: "turns"};
+if (KEEP) try { Object.assign(settings, JSON.parse(localStorage.getItem(STORE + "settings")) ?? {}); } catch {}
+if (!["easy", "medium", "hard"].includes(settings.level)) settings.level = "medium";
+if (!["turns", "you", "computer"].includes(settings.starts)) settings.starts = "turns";
+const saveSettings = () => { if (KEEP) try { localStorage.setItem(STORE + "settings", JSON.stringify(settings)); } catch {} };
+
+// --- the computer's moves ----------------------------------------------------
+//
+// They are worked out in a Web Worker (worker.js), away from the page. Without
+// a worker (an old browser, or the page opened as a file) the page works them out
+// itself. ?solver=main does without it too.
+const brain = {worker: null, asked: 0, waiting: new Map()};
+if (params.get("solver") !== "main" && typeof Worker === "function") {
+  try {
+    brain.worker = new Worker("worker.js");
+    brain.worker.onmessage = e => {
+      const done = brain.waiting.get(e.data.id);
+      brain.waiting.delete(e.data.id);
+      done?.(e.data.column);
+    };
+    brain.worker.onerror = () => {
+      brain.worker = null;
+      for (const done of brain.waiting.values()) done(undefined);
+      brain.waiting.clear();
+    };
+  } catch {
+    brain.worker = null;
+  }
+}
+function thinkOf(moves, level) {
+  const here = () => computerMove(moves, level, {budget: HARD_BUDGET});
+  if (!brain.worker) return Promise.resolve().then(here);
+  return new Promise(resolve => {
+    const id = ++brain.asked;
+    brain.waiting.set(id, column => resolve(column === undefined ? here() : column));
+    brain.worker.postMessage({id, moves, level, budget: HARD_BUDGET});
+  });
+}
+
+// --- the room and its record -------------------------------------------------
+
+// The record to start from: the kept one if there is a good one, or a new game.
+function firstRecord() {
+  if (KEEP) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORE + "room"));
+      if (saved && validState(saved.state) && Number.isInteger(saved.turn) && [0, 1].includes(saved.current) && saved.seats?.length === 2) return saved;
+    } catch {}
+  }
+  const seats = [{kind: "person"}, TEST && params.get("opponent") === "person" ? {kind: "person", name: params.get("name") ?? undefined} : {kind: "computer", level: settings.level}];
+  let state = newState(TEST && params.has("first") ? Number(params.get("first")) : settings.starts === "computer" ? 1 : 0);
+  if (TEST && params.get("moves")) {
+    for (const column of params.get("moves").split(",").map(Number)) state = playMove(state, seatToMove(state), column);
+  }
+  return {seats, current: nextCurrent(state), turn: 0, state};
+}
+
+const keep = record => { if (KEEP) try { localStorage.setItem(STORE + "room", JSON.stringify(record)); } catch {} };
+const room = createLocalRoom({record: firstRecord(), keep, delay: TEST ? Number(params.get("delay") ?? 0) : 0})(0);
+if (TEST) window.gameRoom = room;
+
+const ui = {sent: -1, thought: -1};     // the turn a move was last sent on, or thought about
+let record = null;                       // the record as last received
+let shown = [];                          // the moves whose discs are on the board
+
+const seatName = seat => seat === room.mySeat ? t("you")
+  : record.seats[seat].kind === "computer" ? t("computer") : record.seats[seat].name ?? t("opponent");
+const myTurn = () => record && !outcome(record.state).over && record.current === room.mySeat;
+
+// Every record comes in here: at the start, after a move of ours, and from
+// wherever else a move can come from. It is checked, drawn and followed up.
+function receive(news) {
+  const before = record;
+  if (before && news.turn === before.turn + 1 && !news.restarted) {
+    if (checkTurn(before.state, news.state, before.current)) message(t("refused"));
+  }
+  record = news;
+  render();
+  followUp();
+}
+
+// If the next move is the computer's, ask for it. Any browser in the room could do this.
+async function followUp() {
+  const {state, current, turn, seats} = record;
+  const seat = seats[current];
+  if (outcome(state).over || seat.kind !== "computer" || ui.thought === turn) return;
+  ui.thought = turn;
+  const started = performance.now();
+  const column = await thinkOf(state.moves, seat.level);
+  await new Promise(resolve => setTimeout(resolve, Math.max(0, THINK - (performance.now() - started))));
+  if (record.turn !== turn) return;                       // a new game has started in the meantime
+  send(playMove(state, current, column), {forSeat: current});
+}
+
+async function send(state, options) {
+  ui.sent = record.turn;
+  try {
+    await room.play({state, current: nextCurrent(state)}, options);
+  } catch (e) {
+    ui.sent = -1;
+    ui.thought = -1;
+    console.warn(e);
+    if (e.code !== "stale") message(t("notAccepted"));     // if stale, the newer record is on its way
+  }
+}
+
+function dropInto(column) {
+  if (!myTurn() || ui.sent === record.turn || !legalColumns(record.state).includes(column)) return;
+  send(playMove(record.state, room.mySeat, column));
+}
+
+// The first seat of the next game, by the option.
+function nextFirst(state) {
+  if (settings.starts === "you") return room.mySeat;
+  if (settings.starts === "computer") return 1 - room.mySeat;
+  return state.moves.length ? 1 - state.first : state.first;
+}
+
+const canStartNext = () => record.current === room.mySeat || record.seats[record.current].kind === "computer";
+
+function startNext() {
+  const {state, current} = record;
+  const first = nextFirst(state);
+  const next = nextGame(state, first);
+  if (outcome(state).over) {
+    if (canStartNext()) room.play({state: next, current: first}, current === room.mySeat ? {} : {forSeat: current}).catch(e => console.warn(e));
+  } else {
+    room.restart({state: next, current: first});
+  }
+}
+
+function askNewGame() {
+  if (outcome(record.state).over || !record.state.moves.length) { startNext(); return; }
+  dialog(t("title"), `<p>${t("giveUp")}</p>`, [
+    {label: t("yes"), default: true, action: startNext},
+    {label: t("no"), cancel: true},
+  ]);
+}
+
+// --- drawing -----------------------------------------------------------------
+
+const COLUMN_BUTTONS = [];
+for (let c = 0; c < COLUMNS; c++) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "col";
+  button.dataset.column = c;
+  button.tabIndex = c === 3 ? 0 : -1;
+  button.innerHTML = `<span class="hint"></span>`;
+  button.addEventListener("click", () => dropInto(c));
+  COLUMN_BUTTONS.push(button);
+}
+$("#cols").append(...COLUMN_BUTTONS);
+
+function addDisc(column, row, seat, animate) {
+  const disc = document.createElement("div");
+  disc.className = `disc s${seat}`;
+  disc.dataset.column = column;
+  disc.dataset.row = row;
+  disc.style.setProperty("--x", column);
+  disc.style.setProperty("--y", row);
+  if (animate) {
+    const fall = ROWS - row;                               // from the row above the board
+    disc.style.setProperty("--fall", fall);
+    disc.style.setProperty("--time", `${Math.round(130 * Math.sqrt(fall))}ms`);
+    disc.classList.add("falling");
+    disc.addEventListener("animationend", () => disc.classList.remove("falling"), {once: true});
+  }
+  $("#discs").append(disc);
+}
+
+// Brings the discs in line with the moves. One more move falls in; anything
+// else (a new game, a reload) just appears as it is.
+function drawDiscs() {
+  const {first, moves} = record.state;
+  const oneMore = moves.length === shown.length + 1 && shown.every((column, i) => moves[i] === column);
+  if (!oneMore) $("#discs").replaceChildren();
+  const heights = Array(COLUMNS).fill(0);
+  moves.forEach((column, i) => {
+    const row = heights[column]++;
+    if (oneMore ? i === moves.length - 1 : true) addDisc(column, row, (first + i) % 2, oneMore);
+  });
+  shown = [...moves];
+}
+
+function render() {
+  if (!record) return;
+  const {state} = record;
+  const {over, winner, line} = outcome(state);
+  const mine = myTurn();
+  drawDiscs();
+
+  const discs = [...$("#discs").children];
+  const last = discs.at(-1);
+  for (const disc of discs) {
+    disc.classList.toggle("last", disc === last && !over);
+    disc.classList.toggle("win", line.some(([c, r]) => Number(disc.dataset.column) === c && Number(disc.dataset.row) === r));
+  }
+  $("#board").classList.toggle("won", winner !== null);
+  $("#board").classList.toggle("myturn", mine);
+  const legal = legalColumns(state);
+  const stacks = boardOf(state);
+  COLUMN_BUTTONS.forEach((button, c) => {
+    const full = stacks[c].length >= ROWS;
+    button.setAttribute("aria-disabled", String(!mine || !legal.includes(c)));
+    button.setAttribute("aria-label", full ? t("columnFull", c + 1) : t("column", c + 1));
+    button.querySelector(".hint").className = `hint s${room.mySeat}`;
+  });
+
+  for (const seat of [0, 1]) {
+    const el = $(`#seat-${seat}`);
+    el.classList.toggle("active", !over && record.current === seat);
+    el.querySelector(".name").textContent = seatName(seat);
+    el.querySelector(".wins").textContent = state.wins[seat];
+  }
+
+  const current = record.seats[record.current];
+  let said, status;
+  if (over) {
+    said = winner === null ? t("draw") : winner === room.mySeat ? t("youWon")
+      : record.seats[winner].kind === "computer" ? t("youLost") : t("otherWon", seatName(winner));
+    status = canStartNext() ? t("afterGame") : t("waitNext", seatName(record.current));
+  } else {
+    said = mine ? t("yourTurn") : current.kind === "computer" ? t("thinking") : t("waiting", seatName(record.current));
+    status = said;
+  }
+  $("#said").textContent = said;
+  $("#status").textContent = status;
+  const levels = record.seats.filter(s => s.kind === "computer").map(s => s.level);
+  $("#level").textContent = levels.length ? `${t("level")}: ${t(levels[0])}` : "";
+  $("#level").hidden = !levels.length;
+  $("#draws").textContent = t("draws", state.draws);
+
+  const again = $("#again");
+  const wasFocus = over && !again.classList.contains("default");
+  again.classList.toggle("default", over);
+  again.disabled = over && !canStartNext();
+  if (wasFocus && !again.disabled && !$("#layer").childElementCount) again.focus();
+}
+
+// --- dialogs and menus -------------------------------------------------------
+
+let onEscape = null;
+function dialog(title, body, buttons) {
+  const layer = $("#layer");
+  const box = document.createElement("div");
+  box.className = "dialog";
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  box.innerHTML = `<div class="head"><span class="caption"></span><button type="button" class="close" aria-label="${t("close")}">✕</button></div><div class="body"></div><div class="buttons"></div>`;
+  box.querySelector(".caption").textContent = title;
+  const content = box.querySelector(".body");
+  if (typeof body === "string") content.innerHTML = body; else content.append(body);
+  const row = box.querySelector(".buttons");
+  for (const b of buttons) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "btn" + (b.default ? " default" : "");
+    el.textContent = b.label;
+    el.addEventListener("click", () => { closeDialog(); b.action?.(); });
+    row.append(el);
+  }
+  const cancel = buttons.find(b => b.cancel) ?? buttons[buttons.length - 1];
+  onEscape = () => { closeDialog(); cancel.action?.(); };
+  box.querySelector(".close").addEventListener("click", onEscape);
+  layer.replaceChildren(box);
+  layer.hidden = false;
+  (row.querySelector(".default") ?? row.firstChild)?.focus();
+}
+function closeDialog() {
+  $("#layer").hidden = true;
+  $("#layer").replaceChildren();
+  onEscape = null;
+}
+function message(text) {
+  dialog(t("title"), "<p></p>", [{label: t("ok"), default: true}]);
+  $("#layer .body p").textContent = text;
+}
+const showRules = () => dialog(t("rules"), t("rulesHtml"), [{label: t("ok"), default: true}]);
+
+function showOptions() {
+  const form = document.createElement("form");
+  const radio = (name, value, label, checked) =>
+    `<label><input type="radio" name="${name}" value="${value}"${checked ? " checked" : ""}> ${label}</label>`;
+  form.innerHTML = `
+    <fieldset><legend>${t("level")}</legend>
+      ${["easy", "medium", "hard"].map(l => radio("level", l, t(l), settings.level === l)).join("")}
+      <p style="margin:4px 0 0;font-size:11px">${t("levelNote")}</p></fieldset>
+    <fieldset><legend>${t("starts")}</legend>
+      ${radio("starts", "turns", t("startsTurns"), settings.starts === "turns")}
+      ${radio("starts", "you", t("startsYou"), settings.starts === "you")}
+      ${radio("starts", "computer", t("startsComputer"), settings.starts === "computer")}</fieldset>
+    <fieldset><legend>${t("language")}</legend>
+      ${radio("lang", "nl", "Nederlands", lang === "nl")}${radio("lang", "en", "English", lang === "en")}</fieldset>`;
+  dialog(t("options").replace("...", ""), form, [
+    {label: t("ok"), default: true, action: () => {
+      const data = new FormData(form);
+      settings.level = data.get("level");
+      settings.starts = data.get("starts");
+      saveSettings();
+      record.seats.forEach((seat, i) => {
+        if (seat.kind === "computer" && seat.level !== settings.level) room.setSeat(i, {...seat, level: settings.level});
+      });
+      if (data.get("lang") !== lang) setLanguage(data.get("lang"));
+    }},
+    {label: t("cancel"), cancel: true},
+  ]);
+}
+
+const menuOpen = () => !$("#menu").hidden;
+function openMenu() {
+  $("#menu").hidden = false;
+  $("#menu-button").setAttribute("aria-expanded", "true");
+  $("#menu button").focus();
+}
+function closeMenu() {
+  $("#menu").hidden = true;
+  $("#menu-button").setAttribute("aria-expanded", "false");
+}
+$("#menu-button").addEventListener("click", e => { e.stopPropagation(); menuOpen() ? closeMenu() : openMenu(); });
+addEventListener("click", closeMenu);
+// The arrow keys go through the menu, as in any menu.
+$("#menu").addEventListener("keydown", e => {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  e.preventDefault();
+  e.stopPropagation();
+  const items = [...$("#menu").querySelectorAll("button")];
+  items[(items.indexOf(document.activeElement) + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+});
+for (const item of document.querySelectorAll(".menu button")) {
+  item.addEventListener("click", () => {
+    const act = item.dataset.act;
+    if (act === "new") askNewGame();
+    else if (act === "clear") room.restart({state: {...record.state, wins: [0, 0], draws: 0}, current: record.current});
+    else if (act === "options") showOptions();
+    else if (act === "rules") showRules();
+    else if (act === "about") dialog(t("about").replace("...", ""), t("aboutHtml"), [{label: t("ok"), default: true}]);
+  });
+}
+$("#again").addEventListener("click", askNewGame);
+
+addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if (onEscape) onEscape(); else if (menuOpen()) { closeMenu(); $("#menu-button").focus(); }
+    return;
+  }
+  if (e.key === "F2") { e.preventDefault(); closeMenu(); if (!onEscape) askNewGame(); return; }
+  if (e.key === "F1") { e.preventDefault(); closeMenu(); if (!onEscape) showRules(); return; }
+  if (onEscape || menuOpen() || e.target.closest("input, form")) return;
+  const digit = Number(e.key);
+  if (digit >= 1 && digit <= COLUMNS) { dropInto(digit - 1); return; }
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    e.preventDefault();
+    const at = COLUMN_BUTTONS.indexOf(document.activeElement);
+    const next = at < 0 ? 3 : Math.min(COLUMNS - 1, Math.max(0, at + (e.key === "ArrowLeft" ? -1 : 1)));
+    COLUMN_BUTTONS.forEach((b, c) => { b.tabIndex = c === next ? 0 : -1; });
+    COLUMN_BUTTONS[next].focus();
+  }
+});
+
+// --- language ----------------------------------------------------------------
+
+function setLanguage(name) {
+  lang = name;
+  if (!TEST) try { localStorage.setItem("solfege.lang", name); } catch {}
+  document.documentElement.lang = name;
+  document.title = t("title");
+  for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t);
+  for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
+  render();
+}
+for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLanguage(b.dataset.lang));
+
+setLanguage(lang);
+room.watch(receive);
+
+if (!TEST && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(e => console.warn(e));
+}
+</script>
+</body>
+</html>
