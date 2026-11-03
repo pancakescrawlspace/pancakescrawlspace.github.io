@@ -1,0 +1,1370 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tile Rummy</title>
+<!-- Installing it as an app, and the icons; sw.js keeps it for offline use. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#008080">
+<style>
+  /* A window on a Windows 95 desktop: grey bevelled chrome around a green
+     card table, with a player along each side, as in the old card games. */
+  :root {
+    --desk: #008080;
+    --face: #c0c0c0;
+    --hi: #ffffff;
+    --light: #dfdfdf;
+    --shadow: #808080;
+    --dark: #0a0a0a;
+    --title: #000080;
+    --title-end: #1084d0;
+    --felt: #007a1f;
+    --ink0: #1c1c1c;          /* the four tile colours */
+    --ink1: #c8141e;
+    --ink2: #1646b8;
+    --ink3: #e27500;
+    --ui: "MS Sans Serif", "Microsoft Sans Serif", Tahoma, Geneva, "Segoe UI", system-ui, sans-serif;
+    --t: clamp(22px, min(3.2vw, 5.2vh), 42px);   /* width of a tile in your rack */
+    --tt: calc(var(--t) * .84);                   /* on the table */
+    --to: calc(var(--t) * .62);                   /* in an opponent's hand */
+    --raised: inset -1px -1px var(--dark), inset 1px 1px var(--light), inset -2px -2px var(--shadow), inset 2px 2px var(--hi);
+    --button: inset -1px -1px var(--dark), inset 1px 1px var(--hi), inset -2px -2px var(--shadow), inset 2px 2px var(--light);
+    --pressed: inset 1px 1px var(--dark), inset -1px -1px var(--hi), inset 2px 2px var(--shadow), inset -2px -2px var(--light);
+    --sunken: inset 1px 1px var(--shadow), inset -1px -1px var(--hi), inset 2px 2px var(--dark), inset -2px -2px var(--light);
+  }
+  @media (max-width: 640px) {
+    :root { --t: clamp(22px, 7.4vw, 32px); }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    display: flex;
+    overflow: hidden;
+    background: var(--desk);
+    color: #000;
+    font: 12px/1.35 var(--ui);
+    -webkit-tap-highlight-color: transparent;
+  }
+  @media (pointer: coarse) { body { font-size: 13px; } }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* --- the window chrome --- */
+  .window {
+    display: flex;
+    flex-direction: column;
+    padding: 3px;
+    background: var(--face);
+    box-shadow: var(--raised);
+  }
+  .window.main {
+    width: min(1200px, calc(100vw - 32px));
+    height: min(880px, calc(100dvh - 32px));
+    margin: auto;
+  }
+  @media (max-width: 640px), (max-height: 560px) {
+    .window.main { width: 100vw; height: 100dvh; }
+  }
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 20px;
+    padding: 1px 2px 1px 3px;
+    background: linear-gradient(90deg, var(--title), var(--title-end));
+    color: #fff;
+    font-weight: bold;
+    user-select: none;
+  }
+  .titlebar .caption { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .titlebar svg { width: 16px; height: 16px; flex: none; }
+  .tbtn {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 14px;
+    padding: 0;
+    border: none;
+    background: var(--face);
+    box-shadow: var(--button);
+    color: #000;
+    font: bold 9px/1 Arial, sans-serif;
+  }
+  .tbtn + .tbtn.close { margin-left: 2px; }
+  .menubar { display: flex; padding: 1px 0 2px; position: relative; user-select: none; }
+  .menubar .mb { padding: 2px 7px; border: none; background: none; cursor: default; }
+  .menubar .mb.open { background: var(--title); color: #fff; }
+  .menubar .spacer { flex: 1; }
+  .menubar .lang { display: flex; gap: 0; margin-right: 2px; }
+  .menubar .lang button { padding: 2px 6px; border: none; background: none; cursor: default; }
+  .menubar .lang button[aria-pressed=true] { box-shadow: var(--sunken); background: var(--light); }
+  .menu {
+    position: absolute;
+    z-index: 30;
+    top: 100%;
+    min-width: 190px;
+    padding: 2px;
+    background: var(--face);
+    box-shadow: var(--raised);
+  }
+  .menu button {
+    display: flex;
+    justify-content: space-between;
+    gap: 28px;
+    width: 100%;
+    padding: 3px 18px 3px 20px;
+    border: none;
+    background: none;
+    text-align: left;
+    cursor: default;
+    position: relative;
+  }
+  .menu button:hover, .menu button:focus-visible { background: var(--title); color: #fff; outline: none; }
+  .menu button[aria-checked=true]::before { content: "•"; position: absolute; left: 8px; font-weight: bold; }
+  .menu hr { margin: 3px 1px; border: none; border-top: 1px solid var(--shadow); border-bottom: 1px solid var(--hi); }
+
+  .btn {
+    min-width: 92px;
+    padding: 4px 10px;
+    border: none;
+    background: var(--face);
+    box-shadow: var(--button);
+    cursor: default;
+    white-space: nowrap;
+  }
+  .btn.default { box-shadow: 0 0 0 1px #000, var(--button); }
+  .btn:active:not(:disabled) { box-shadow: var(--pressed); padding: 5px 9px 3px 11px; }
+  .btn.default:active:not(:disabled) { box-shadow: 0 0 0 1px #000, var(--pressed); }
+  .btn:focus-visible { outline: 1px dotted #000; outline-offset: -5px; }
+  .btn:disabled { color: var(--shadow); text-shadow: 1px 1px var(--hi); }
+
+  .statusbar { display: flex; gap: 2px; padding-top: 2px; }
+  .statusbar > div {
+    min-width: 0;
+    padding: 2px 5px;
+    box-shadow: inset 1px 1px var(--shadow), inset -1px -1px var(--hi);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #status { flex: 1; }
+  #status.warn { color: #a00000; }
+
+  /* --- the table: opponents left, top and right, you at the bottom --- */
+  .felt {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: 2px;
+    background: var(--felt);
+    box-shadow: var(--sunken);
+    color: #fff;
+  }
+  .seat { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 0; padding: 6px; }
+  #seat-top { grid-area: 1 / 2 / 2 / 3; flex-direction: column; }
+  #seat-left { grid-area: 1 / 1 / 3 / 2; flex-direction: column; }
+  #seat-right { grid-area: 1 / 3 / 3 / 4; flex-direction: column; }
+  #seat-bottom { grid-area: 3 / 1 / 4 / 4; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 6px 14px; padding: 4px 8px 8px; }
+  .who { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 9em; }
+  .who .name { padding: 0 4px; font-weight: bold; text-shadow: 1px 1px 0 rgba(0, 0, 0, .45); }
+  .seat.active .who .name { background: var(--title); text-shadow: none; outline: 1px dotted #fff; }
+  .who .count { font-size: 11px; opacity: .85; }
+  .said { min-height: 1.35em; font-size: 11px; color: #fff59a; text-align: center; max-width: 11em; }
+  #seat-top .said { max-width: none; }
+  .hand { position: relative; --w: var(--to); }
+  .hand.h { width: 100%; height: calc(var(--to) * 1.36); }
+  .hand.v { flex: 1; width: calc(var(--to) * 1.36 + 4px); min-height: 40px; }
+  .hand > .tile { position: absolute; }
+  .hand.v > .tile { transform: rotate(90deg); }
+
+  #table {
+    grid-area: 2 / 2 / 3 / 3;
+    --w: var(--tt);
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    justify-content: center;
+    gap: 10px 14px;
+    min-height: 0;
+    padding: 10px 6px;
+    overflow: auto;
+  }
+  .set {
+    display: flex;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, .16);
+  }
+  .set.bad { border-color: #ff6a5c; background: rgba(150, 0, 0, .4); }
+  .set.locked { opacity: .82; }
+  .newset {
+    display: grid;
+    place-items: center;
+    min-width: calc(var(--tt) * 3.4);
+    min-height: calc(var(--tt) * 1.36 + 10px);
+    padding: 0 8px;
+    border: 1px dashed rgba(255, 255, 255, .55);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, .8);
+    font-size: 11px;
+  }
+  .set.over, .newset.over, #rack.over { outline: 2px dashed #fff59a; outline-offset: 2px; }
+  .empty-table { align-self: center; margin: auto; color: rgba(255, 255, 255, .6); text-align: center; }
+
+  .mine { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; }
+  .mine .who { flex-direction: row; gap: 8px; max-width: none; }
+  #rack {
+    --w: var(--t);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: flex-start;
+    gap: 3px;
+    width: min(100%, calc((var(--t) + 3px) * 15 + 12px));
+    max-height: calc((var(--t) * 1.36 + 3px) * 3 + 12px);
+    min-height: calc(var(--t) * 1.36 + 12px);
+    padding: 6px;
+    overflow-y: auto;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, .25);
+    box-shadow: inset 1px 1px 3px rgba(0, 0, 0, .5);
+  }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; color: #000; }
+  .controls .wide { grid-column: span 2; }
+  @media (max-width: 640px) {
+    .controls { grid-template-columns: repeat(4, auto); }
+    .controls .wide { grid-column: auto; }
+    .controls .btn { min-width: 0; padding: 4px 7px; }
+    .seat { padding: 4px 3px; }
+    #table { gap: 8px 10px; padding: 8px 4px; }
+  }
+
+  /* --- tiles --- */
+  .tile {
+    --ink: var(--ink0);
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--w);
+    height: calc(var(--w) * 1.36);
+    border-radius: calc(var(--w) * .14);
+    background: linear-gradient(160deg, #fffef9, #f4ecd4 65%, #e6dab6);
+    box-shadow: inset 0 0 0 1px rgba(90, 70, 30, .4), inset -1px -2px 0 rgba(120, 95, 40, .28), 1px 2px 2px rgba(0, 0, 0, .45);
+    color: var(--ink);
+    font: 800 calc(var(--w) * .56)/1 "Arial Black", "Arial Bold", Arial, sans-serif;
+    letter-spacing: -.04em;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+  .tile.k1 { --ink: var(--ink1); }
+  .tile.k2 { --ink: var(--ink2); }
+  .tile.k3 { --ink: var(--ink3); }
+  .tile svg { width: 74%; height: auto; }
+  .tile .rep { position: absolute; right: 7%; bottom: 4%; font-size: 36%; opacity: .75; }
+  .tile.back { background: linear-gradient(160deg, #f7f0da, #e4d7ae); }
+  .tile.mine { background: linear-gradient(160deg, #fbfdff, #dde9fb 70%, #c9daf3); }
+  .tile.recent { box-shadow: 0 0 0 2px #ffd400, 1px 2px 3px rgba(0, 0, 0, .5); }
+  .tile.new { box-shadow: 0 0 0 2px #8cf58c, 1px 2px 3px rgba(0, 0, 0, .5); }
+  .tile.sel { transform: translateY(-5px); box-shadow: 0 0 0 2px #fff59a, 1px 5px 4px rgba(0, 0, 0, .5); }
+  .tile.can { cursor: grab; }
+  .tile.dragging { opacity: .25; }
+  .ghost { position: fixed; z-index: 50; display: flex; gap: 2px; pointer-events: none; --w: var(--t); }
+  .ghost .tile { box-shadow: inset 0 0 0 1px rgba(90, 70, 30, .4), 3px 7px 9px rgba(0, 0, 0, .45); transform: none; }
+
+  /* --- dialogs --- */
+  .layer { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 12px; }
+  .dialog { width: min(460px, 100%); max-height: calc(100dvh - 24px); }
+  .dialog.wide { width: min(620px, 100%); }
+  .dialog .body { padding: 12px 12px 4px; overflow: auto; }
+  .dialog .body p { margin: 0 0 10px; }
+  .dialog .body h3 { margin: 12px 0 4px; font-size: 1em; }
+  .dialog .body ul { margin: 0 0 8px; padding-left: 18px; }
+  .dialog .buttons { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 12px 10px; }
+  .msg { display: flex; gap: 12px; align-items: flex-start; }
+  .msg svg { flex: none; width: 32px; height: 32px; }
+  fieldset { margin: 0 0 10px; padding: 6px 10px 8px; border: none; box-shadow: inset -1px -1px var(--hi), inset 1px 1px var(--shadow), inset -2px -2px var(--shadow), inset 2px 2px var(--hi); }
+  /* The frame is a shadow, which a legend can't interrupt as it does a border;
+     so the legend covers it, as the title of a Windows 95 group box does. */
+  legend { padding: 0 3px; background: var(--face); }
+  fieldset label { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
+  fieldset .note { margin: 4px 0 0; color: #333; font-size: 11px; }
+  .sheet { width: 100%; border-collapse: collapse; background: #fff; box-shadow: var(--sunken); }
+  .sheet th, .sheet td { padding: 3px 8px; text-align: right; white-space: nowrap; }
+  .sheet th:first-child, .sheet td:first-child { text-align: left; }
+  .sheet thead th { border-bottom: 1px solid var(--shadow); }
+  .sheet tfoot td { border-top: 1px solid var(--shadow); font-weight: bold; }
+  .sheet .win { color: #006000; }
+  .sheet .neg { color: #a00000; }
+  .result { margin-bottom: 10px; font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="window main" id="app">
+  <div class="titlebar">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="12" rx="1.5" fill="#fffbe8" stroke="#000"/><rect x="5.5" y="2.5" width="9" height="12" rx="1.5" fill="#fffbe8" stroke="#000"/><text x="10" y="12" font-size="8" font-family="Arial" font-weight="bold" text-anchor="middle" fill="#c8141e">7</text></svg>
+    <span class="caption">Tile Rummy</span>
+    <span class="tbtn" aria-hidden="true">_</span><span class="tbtn" aria-hidden="true">□</span><span class="tbtn close" aria-hidden="true">✕</span>
+  </div>
+  <nav class="menubar" id="menubar">
+    <button type="button" class="mb" data-menu="game" data-t="menuGame"></button>
+    <button type="button" class="mb" data-menu="help" data-t="menuHelp"></button>
+    <span class="spacer"></span>
+    <span class="lang" role="group" aria-label="Taal / Language">
+      <button type="button" data-lang="nl" lang="nl" title="Nederlands">NL</button>
+      <button type="button" data-lang="en" lang="en" title="English">EN</button>
+    </span>
+    <div class="menu" id="menu-game" role="menu" hidden>
+      <button type="button" role="menuitem" data-act="new"><span data-t="newGame"></span><span>F2</span></button>
+      <hr>
+      <button type="button" role="menuitemradio" data-act="opp" data-n="1"><span data-t="opp1"></span></button>
+      <button type="button" role="menuitemradio" data-act="opp" data-n="2"><span data-t="opp2"></span></button>
+      <button type="button" role="menuitemradio" data-act="opp" data-n="3"><span data-t="opp3"></span></button>
+      <hr>
+      <button type="button" role="menuitem" data-act="scores"><span data-t="scores"></span></button>
+      <button type="button" role="menuitem" data-act="options"><span data-t="options"></span></button>
+    </div>
+    <div class="menu" id="menu-help" role="menu" hidden>
+      <button type="button" role="menuitem" data-act="rules"><span data-t="rules"></span><span>F1</span></button>
+      <hr>
+      <button type="button" role="menuitem" data-act="about"><span data-t="about"></span></button>
+    </div>
+  </nav>
+  <div class="felt" id="felt">
+    <div class="seat" id="seat-left" hidden><div class="who"><span class="name"></span><span class="count"></span></div><div class="hand v"></div><div class="said"></div></div>
+    <div class="seat" id="seat-top" hidden><div class="hand h"></div><div class="who"><span class="name"></span><span class="count"></span></div><div class="said"></div></div>
+    <div class="seat" id="seat-right" hidden><div class="who"><span class="name"></span><span class="count"></span></div><div class="hand v"></div><div class="said"></div></div>
+    <div id="table"></div>
+    <div class="seat" id="seat-bottom">
+      <div class="mine">
+        <div class="who"><span class="name"></span><span class="said"></span></div>
+        <div id="rack"></div>
+      </div>
+      <div class="controls">
+        <button type="button" class="btn default wide" id="go"></button>
+        <button type="button" class="btn wide" id="reset" data-t="reset"></button>
+        <button type="button" class="btn" id="sort-num" data-t="sortNum"></button>
+        <button type="button" class="btn" id="sort-color" data-t="sortColor"></button>
+      </div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <div id="status"></div>
+    <div id="pool"></div>
+    <div id="clock" hidden></div>
+  </div>
+</div>
+<div class="layer" id="layer" hidden></div>
+
+<script src="rules.js"></script>
+<script>
+"use strict";
+
+// The rules and the computer players are in rules.js.
+
+const $ = sel => document.querySelector(sel);
+const params = new URLSearchParams(location.search);
+// ?test is for test/index.html: no waiting between turns, and nothing kept
+// between visits. ?seed=1 deals the same tiles every time.
+const TEST = params.has("test");
+let random = Math.random;
+if (params.has("seed")) {
+  let s = Number(params.get("seed")) >>> 0;
+  random = () => {                       // mulberry32
+    s = (s + 0x6D2B79F5) >>> 0;
+    let x = Math.imul(s ^ s >>> 15, s | 1);
+    x ^= x + Math.imul(x ^ x >>> 7, x | 61);
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+}
+const NAMES = ["Anna", "Bas", "Carmen"];
+const SEATS = {1: ["top"], 2: ["left", "right"], 3: ["left", "top", "right"]};
+const THINK = 750, PAUSE = 550, TURN_SECONDS = 60;
+
+// --- languages ---------------------------------------------------------------
+
+const RULES_NL = `
+<p>Wie als eerste al zijn stenen kwijt is, wint het spel.</p>
+<h3>De stenen</h3>
+<p>Er zijn 106 stenen: de getallen 1 tot en met 13 in vier kleuren (zwart, rood, blauw en oranje), elk twee keer, en twee jokers. Iedereen krijgt er 14; de rest is de pot. Wie bij het trekken de hoogste steen pakt, begint; daarna gaat de beurt met de klok mee.</p>
+<h3>Reeksen</h3>
+<ul>
+<li>Een <b>groep</b> is drie of vier stenen met hetzelfde getal, elk in een andere kleur.</li>
+<li>Een <b>rij</b> is drie of meer opeenvolgende getallen in één kleur. De 1 is altijd de laagste: na 13 komt geen 1.</li>
+<li>Een <b>joker</b> kan elke steen zijn die een reeks nodig heeft.</li>
+</ul>
+<h3>Je eerste zet</h3>
+<p>De eerste keer dat je uitlegt, moeten je reeksen samen minstens 30 punten waard zijn, en alleen uit stenen van je eigen plankje bestaan. Een steen is zijn getal waard; een joker telt als de steen die hij vervangt. Pas vanaf je volgende beurt mag je aanleggen en schuiven.</p>
+<h3>Je beurt</h3>
+<p>Leg stenen uit, of pak een steen uit de pot; daarmee is je beurt voorbij. Wie niets van zijn plankje legt, moet een steen pakken. Een steen die je net gepakt hebt, kun je pas de volgende beurt spelen.</p>
+<h3>Schuiven</h3>
+<p>Na je eerste zet mag je de reeksen op tafel aanvullen, splitsen en anders indelen, ook met jokers, zolang aan het eind van je beurt alles op tafel een geldige groep of rij is en je minstens één steen van je plankje hebt gelegd. Stenen die al op tafel lagen, gaan nooit terug naar een plankje.</p>
+<h3>Het einde</h3>
+<p>Wie uit is, wint het spel. De anderen tellen de stenen op hun plankje als minpunten (een joker is 30); de winnaar krijgt ze samen als pluspunten. Is de pot leeg en kan niemand meer, dan wint wie het minst overhoudt; de anderen krijgen het verschil met de winnaar als minpunten.</p>
+<h3>Tijd</h3>
+<p>Met <i>Eén minuut per beurt</i> aan (in Spel → Opties) heb je een minuut. Ben je dan niet klaar, dan pak je een steen; had je al geschoven, dan gaat alles terug en pak je er drie.</p>
+<h3>Zo speel je hier</h3>
+<p>Sleep stenen van je plankje naar de tafel: op een reeks om aan te leggen, of naar het lege vak om een nieuwe te beginnen. Tik stenen aan om er meer tegelijk te slepen, of tik daarna op een reeks of het lege vak om ze erheen te leggen. Wat nog geen geldige reeks is, kleurt rood. Een steen die je deze beurt hebt gelegd, kun je terugslepen naar je plankje; <i>Terugzetten</i> zet alles terug zoals het aan het begin van je beurt lag. Stenen die een tegenstander net legde, zijn geel omrand.</p>`;
+
+const RULES_EN = `
+<p>The first player to get rid of all their tiles wins the game.</p>
+<h3>The tiles</h3>
+<p>There are 106 tiles: the numbers 1 to 13 in four colours (black, red, blue and orange), twice each, and two jokers. Everyone gets 14; the rest is the pool. Whoever draws the highest tile starts; then play goes clockwise.</p>
+<h3>Sets</h3>
+<ul>
+<li>A <b>group</b> is three or four tiles of the same number, each in a different colour.</li>
+<li>A <b>run</b> is three or more consecutive numbers in one colour. 1 is always the lowest: no 1 after 13.</li>
+<li>A <b>joker</b> can be any tile a set needs.</li>
+</ul>
+<h3>Your first meld</h3>
+<p>The first time you lay down tiles, your sets must be worth at least 30 points together, and use only tiles from your own rack. A tile is worth its number; a joker counts as the tile it stands for. Only from your next turn on may you add to and rearrange the table.</p>
+<h3>Your turn</h3>
+<p>Lay down tiles, or draw one from the pool, which ends your turn. If you lay down nothing from your rack, you must draw. A tile you just drew can only be played on a later turn.</p>
+<h3>Rearranging</h3>
+<p>After your first meld you may add to, split and regroup the sets on the table, jokers too, as long as at the end of your turn everything on the table is a valid group or run and you have played at least one tile from your rack. Tiles that were on the table never go back to a rack.</p>
+<h3>The end</h3>
+<p>Whoever goes out wins the game. The others count the tiles on their rack as minus points (a joker is 30); the winner gets their total as plus points. If the pool is empty and nobody can play, whoever has the least left wins; the others score the difference with the winner as minus points.</p>
+<h3>Time</h3>
+<p>With <i>One minute per turn</i> on (in Game → Options) you have a minute. If you're not done by then, you draw a tile; if you had moved tiles, everything goes back and you draw three.</p>
+<h3>Playing here</h3>
+<p>Drag tiles from your rack to the table: onto a set to add to it, or to the empty box to start a new one. Tap tiles to drag several at once, or tap a set or the empty box afterwards to put them there. Anything that isn't a valid set yet turns red. A tile you laid down this turn can be dragged back to your rack; <i>Undo</i> puts everything back as it was at the start of your turn. Tiles an opponent just played have a yellow edge.</p>`;
+
+const STRINGS = {
+  nl: {
+    menuGame: "Spel", menuHelp: "Help",
+    newGame: "Nieuw spel", opp1: "Eén tegenstander", opp2: "Twee tegenstanders", opp3: "Drie tegenstanders",
+    scores: "Scores...", options: "Opties...", rules: "Spelregels", about: "Over Tile Rummy",
+    you: "Jij",
+    tiles: n => n === 1 ? "1 steen" : `${n} stenen`,
+    pool: n => `Pot: ${n}`,
+    draw: "Pak een steen", pass: "Passen", done: "Klaar",
+    reset: "Terugzetten", sortNum: "Op getal", sortColor: "Op kleur",
+    newSet: "nieuwe reeks",
+    emptyTable: "Nog niets op tafel",
+    colours: ["zwarte", "rode", "blauwe", "oranje"],
+    tileName: (c, v) => `${STRINGS.nl.colours[c]} ${v}`, joker: "joker",
+    yourTurn: "Jouw beurt: leg stenen uit, of pak een steen.",
+    yourFirst: p => `Jouw beurt. Je eerste zet moet minstens 30 punten zijn; nu ${p}.`,
+    yourTurnEmpty: "Jouw beurt. De pot is leeg: leg stenen uit, of pas.",
+    theirTurn: name => `${name} is aan de beurt...`,
+    starts: (name, v) => name === null ? `Je pakte een ${v}, de hoogste, en begint.` : `${name} pakte de hoogste steen (${v}) en begint.`,
+    picked: v => `pakte een ${v}`,
+    saidDraw: "pakte een steen", saidDrewTile: id => `pakte een ${tileName(id)}`, saidPass: "past",
+    saidPlay: n => n === 1 ? "legde 1 steen" : `legde ${n} stenen`,
+    saidMeld: p => `kwam uit met ${p} punten`,
+    saidOut: "is uit!", saidPenalty: "pakte drie strafstenen",
+    youDrew: id => `Je pakte een ${tileName(id)}.`,
+    youPassed: "Je past.",
+    nothingFromRack: "Je legde niets van je plankje, dus alles gaat terug en je pakt een steen.",
+    errInvalid: "Niet alles op tafel is een geldige groep of rij. Maak de rode reeksen af, of zet ze terug.",
+    errMeld: p => `Je eerste zet moet minstens 30 punten zijn, uit je eigen stenen. Je hebt er nu ${p}.`,
+    errBack: "Stenen die al op tafel lagen, kunnen niet terug naar je plankje.",
+    errLocked: "Pas na je eerste zet mag je aanleggen bij wat al op tafel ligt.",
+    timeUp: "De tijd is om: je pakt een steen.",
+    timeUpPenalty: "De tijd is om: alles gaat terug en je pakt drie stenen.",
+    game: n => `Spel ${n}`, total: "Totaal", wins: "Gewonnen",
+    wonOut: name => name === null ? "Je bent uit en wint dit spel!" : `${name} is uit en wint dit spel.`,
+    wonBlocked: name => `De pot is leeg en niemand kan meer. ${name ?? "Jij"} houdt het minst over en wint.`,
+    noGames: "Er is nog geen spel uitgespeeld.",
+    next: "Volgend spel", ok: "OK", cancel: "Annuleren", close: "Sluiten",
+    optOpp: "Tegenstanders", optLevel: "De tegenstanders", easy: "Makkelijk: leggen alleen aan",
+    strong: "Sterk: schuiven ook op tafel", optimal: "Optimaal: altijd de beste zet van de beurt", optTimer: "Eén minuut per beurt", optLang: "Taal",
+    restartNote: "Een ander aantal tegenstanders begint een nieuw spel.",
+    newGameAsk: "Een nieuw spel beginnen? De scores gaan dan verloren.", yes: "Ja", no: "Nee",
+    aboutText: `<p><b>Tile Rummy</b></p><p>Een spel met genummerde stenen voor jou en één tot drie computerspelers, naar de officiële regels van het bekende stenenspel. Alles draait in je browser; er is geen server.</p>`,
+    solverwasm: "De zetten van de tegenstanders worden berekend in een Web Worker, met WebAssembly.",
+    solverjs: "De zetten van de tegenstanders worden berekend in een Web Worker, in JavaScript.",
+    solvermain: "De zetten van de tegenstanders worden berekend op de pagina zelf, in JavaScript.",
+    rulesHtml: RULES_NL,
+  },
+  en: {
+    menuGame: "Game", menuHelp: "Help",
+    newGame: "New game", opp1: "One opponent", opp2: "Two opponents", opp3: "Three opponents",
+    scores: "Scores...", options: "Options...", rules: "Rules", about: "About Tile Rummy",
+    you: "You",
+    tiles: n => n === 1 ? "1 tile" : `${n} tiles`,
+    pool: n => `Pool: ${n}`,
+    draw: "Draw a tile", pass: "Pass", done: "Done",
+    reset: "Undo", sortNum: "By number", sortColor: "By colour",
+    newSet: "new set",
+    emptyTable: "Nothing on the table yet",
+    colours: ["black", "red", "blue", "orange"],
+    tileName: (c, v) => `${STRINGS.en.colours[c]} ${v}`, joker: "joker",
+    yourTurn: "Your turn: lay down tiles, or draw one.",
+    yourFirst: p => `Your turn. Your first meld must be at least 30 points; now ${p}.`,
+    yourTurnEmpty: "Your turn. The pool is empty: lay down tiles, or pass.",
+    theirTurn: name => `${name}'s turn...`,
+    starts: (name, v) => name === null ? `You drew a ${v}, the highest, and start.` : `${name} drew the highest tile (${v}) and starts.`,
+    picked: v => `drew a ${v}`,
+    saidDraw: "drew a tile", saidDrewTile: id => `drew a ${tileName(id)}`, saidPass: "passes",
+    saidPlay: n => n === 1 ? "played 1 tile" : `played ${n} tiles`,
+    saidMeld: p => `opened with ${p} points`,
+    saidOut: "is out!", saidPenalty: "drew three penalty tiles",
+    youDrew: id => `You drew a ${tileName(id)}.`,
+    youPassed: "You pass.",
+    nothingFromRack: "You played nothing from your rack, so everything goes back and you draw a tile.",
+    errInvalid: "Not everything on the table is a valid group or run. Finish the red sets, or put them back.",
+    errMeld: p => `Your first meld must be at least 30 points, from your own tiles. You have ${p} now.`,
+    errBack: "Tiles that were on the table can't go back to your rack.",
+    errLocked: "Only after your first meld may you add to what is on the table.",
+    timeUp: "Time's up: you draw a tile.",
+    timeUpPenalty: "Time's up: everything goes back and you draw three tiles.",
+    game: n => `Game ${n}`, total: "Total", wins: "Won",
+    wonOut: name => name === null ? "You're out and win this game!" : `${name} is out and wins this game.`,
+    wonBlocked: name => `The pool is empty and nobody can play. ${name === null ? "You have" : name + " has"} the least left and ${name === null ? "win" : "wins"}.`,
+    noGames: "No game has been finished yet.",
+    next: "Next game", ok: "OK", cancel: "Cancel", close: "Close",
+    optOpp: "Opponents", optLevel: "The opponents", easy: "Easy: only add to sets",
+    strong: "Strong: also rearrange the table", optimal: "Optimal: always the best move of the turn", optTimer: "One minute per turn", optLang: "Language",
+    restartNote: "Another number of opponents starts a new game.",
+    newGameAsk: "Start a new game? The scores will be lost.", yes: "Yes", no: "No",
+    aboutText: `<p><b>Tile Rummy</b></p><p>A game with numbered tiles for you and one to three computer players, by the official rules of the well-known tile game. Everything runs in your browser; there is no server.</p>`,
+    solverwasm: "The opponents' moves are worked out in a Web Worker, with WebAssembly.",
+    solverjs: "The opponents' moves are worked out in a Web Worker, in JavaScript.",
+    solvermain: "The opponents' moves are worked out on the page itself, in JavaScript.",
+    rulesHtml: RULES_EN,
+  },
+};
+
+let lang = "nl";
+if (!TEST) try {
+  const saved = localStorage.getItem("solfege.lang");     // shared with the solfège and piano pages
+  if (saved && Object.hasOwn(STRINGS, saved)) lang = saved;
+} catch {}
+function t(key, ...args) {
+  const text = STRINGS[lang][key];
+  return typeof text === "function" ? text(...args) : text;
+}
+// Text that is kept and shown later is kept as [key, ...args], so it follows a change of language.
+const say = msg => msg ? t(...msg) : "";
+const tileName = id => TILES[id].joker ? t("joker") : t("tileName", TILES[id].c, TILES[id].v);
+
+// --- settings ----------------------------------------------------------------
+
+const LEVELS = ["easy", "strong", "optimal"];
+const settings = {opponents: 3, level: "strong", timer: false};
+if (!TEST) try { Object.assign(settings, JSON.parse(localStorage.getItem("rummy.settings")) ?? {}); } catch {}
+{
+  const n = Number(params.get("opponents"));
+  if ([1, 2, 3].includes(n)) settings.opponents = n;
+  if (![1, 2, 3].includes(settings.opponents)) settings.opponents = 3;
+  if (!LEVELS.includes(settings.level)) settings.level = "strong";
+}
+const saveSettings = () => { if (!TEST) try { localStorage.setItem("rummy.settings", JSON.stringify(settings)); } catch {} };
+
+// --- the game ----------------------------------------------------------------
+
+let game = null;
+let sheet = [];               // the scores of the games so far: [{points: [...], winner}]
+const timers = new Set();
+const ui = {selected: new Set(), press: null, pendingRender: false, warnUntil: 0};
+
+function later(fn, ms) {
+  const id = setTimeout(() => { timers.delete(id); fn(); }, TEST ? 0 : ms);
+  timers.add(id);
+}
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+const me = () => game.players[0];
+const current = () => game.players[game.current];
+const myTurn = () => game && !game.over && game.current === 0;
+const nameOf = p => p.human ? null : p.name;
+
+// --- the computer players' moves --------------------------------------------------
+//
+// The moves are worked out in a Web Worker (worker.js), away from the page, so
+// that even a long think never stops it; the worker uses the WebAssembly solver
+// when it loads, and else rules.js's own. Without a worker (an old browser, or
+// the page opened as a file) the page works them out itself, with rules.js.
+// ?solver=js keeps the worker to JavaScript, and ?solver=main does without it.
+const brain = {worker: null, solver: "main", asked: 0, turn: 0, waiting: new Map()};
+if (params.get("solver") !== "main" && typeof Worker === "function") {
+  try {
+    brain.worker = new Worker(params.get("solver") === "js" ? "worker.js?solver=js" : "worker.js");
+    brain.solver = "js";
+    brain.worker.onmessage = e => {
+      if (e.data.solver) brain.solver = e.data.solver;            // "wasm" once it has loaded
+      const done = brain.waiting.get(e.data.id);
+      brain.waiting.delete(e.data.id);
+      done?.(e.data.move);
+    };
+    // A worker that fails (it couldn't load, say): the page works the moves out itself from then on.
+    brain.worker.onerror = () => {
+      brain.worker = null;
+      brain.solver = "main";
+      for (const done of brain.waiting.values()) done(undefined);
+      brain.waiting.clear();
+    };
+  } catch {
+    brain.worker = null;
+  }
+}
+
+// A computer player's move (see computerMove in rules.js), as a promise.
+function thinkOf(table, rack, melded, level) {
+  const here = () => computerMove(table, rack, melded, level);
+  if (!brain.worker) return Promise.resolve(here());
+  return new Promise(resolve => {
+    const id = ++brain.asked;
+    brain.waiting.set(id, move => resolve(move === undefined ? here() : move));
+    brain.worker.postMessage({id, table, rack, melded, level});
+  });
+}
+
+// --- keeping the game ------------------------------------------------------------
+//
+// The game is kept in the browser at the start of every turn and after each of
+// your moves, so a reload carries on where it was: an accidental one, a phone
+// that dropped the page, or a development server that reloads on every change.
+// It is not kept the moment a turn ends, so a reload then gives that turn
+// back as it began, never a second one. With ?test it is only kept with &keep.
+const KEEP = !TEST || params.has("keep");
+const GAME_KEY = TEST ? "rummy.test-game" : "rummy.game";
+
+function saveGame() {
+  if (!KEEP || !game) return;
+  try {
+    localStorage.setItem(GAME_KEY, JSON.stringify({version: 1, game: {...game, recent: [...game.recent]}, sheet}));
+  } catch {}
+}
+
+// Carries on with the kept game if there is one for this number of players;
+// a finished one goes on to the next game, with its scores.
+function resumeGame() {
+  if (!KEEP) return false;
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(GAME_KEY)); } catch { return false; }
+  const kept = saved?.version === 1 ? saved.game : null;
+  if (!kept || kept.players?.length !== settings.opponents + 1) return false;
+  const all = [...kept.players.flatMap(p => p.rack), ...kept.table.flat(), ...kept.pool].sort((a, b) => a - b);
+  if (all.length !== TILES.length || all.some((id, i) => id !== i)) return false;   // not a whole game: start afresh
+  sheet = Array.isArray(saved.sheet) ? saved.sheet : [];
+  if (kept.over) { newGame(false); return true; }
+  game = {...kept, recent: new Set(kept.recent)};
+  game.players[0].name = t("you");
+  if (myTurn()) {               // your turn, with the moves you had made in it
+    startClock();
+    render();
+  } else {                      // an opponent's turn begins again
+    beginTurn();
+  }
+  return true;
+}
+
+function newGame(clearScores) {
+  for (const id of timers) clearTimeout(id);
+  timers.clear();
+  brain.turn++;
+  stopClock();
+  if (clearScores) sheet = [];
+  const pool = shuffle(TILES.map(tile => tile.id));
+  const players = [{human: true, seat: "bottom", name: t("you")},
+                   ...SEATS[settings.opponents].map((seat, i) => ({human: false, seat, name: NAMES[i]}))];
+  for (const p of players) Object.assign(p, {rack: pool.splice(0, 14), melded: false, said: null});
+  // Everyone draws a tile; the highest starts, and a tie draws again.
+  let picks, top;
+  do {
+    const bag = shuffle(TILES.filter(tile => !tile.joker).map(tile => tile.v));
+    picks = players.map((_, i) => bag[i]);
+    top = Math.max(...picks);
+  } while (picks.filter(v => v === top).length > 1);
+  const starter = picks.indexOf(top);
+  players.forEach((p, i) => { if (!p.human) p.said = ["picked", picks[i]]; });
+  game = {players, pool, table: [], current: starter, over: false, passes: 0,
+          start: {table: [], rack: players[starter].rack.slice(), melded: false},
+          recent: new Set(), drawn: null, status: ["starts", nameOf(players[starter]), top], deadline: 0};
+  ui.selected.clear();
+  saveGame();
+  render();
+  later(beginTurn, starter === 0 ? 0 : 1200);
+}
+
+function beginTurn() {
+  const p = current();
+  game.start = {table: game.table.map(set => set.slice()), rack: p.rack.slice(), melded: p.melded};
+  saveGame();
+  if (p.human) {
+    game.status = null;
+    ui.selected.clear();
+    startClock();
+    render();
+  } else {
+    // The thinking starts at once, and the move comes after the pause or the
+    // thinking, whichever is longer; unless by then the turn is no longer
+    // this one (a new game, say).
+    render();
+    const turn = ++brain.turn;
+    const thought = thinkOf(game.table, p.rack, p.melded, settings.level);
+    later(() => thought.then(move => { if (turn === brain.turn) computerTurn(move); }), THINK);
+  }
+}
+
+function nextTurn() {
+  if (game.over) return;
+  game.current = (game.current + 1) % game.players.length;
+  beginTurn();
+}
+
+// Draws a tile, or passes if the pool is empty; the game is over once everyone
+// in a row has had to pass.
+function drawFor(p, n = 1) {
+  if (!game.pool.length) {
+    p.said = ["saidPass"];
+    game.passes++;
+    if (game.passes >= game.players.length) { endGame(null); return false; }
+    return true;
+  }
+  for (let i = 0; i < n && game.pool.length; i++) {
+    const id = game.pool.pop();
+    p.rack.push(id);
+    if (p.human) game.drawn = id;
+  }
+  p.said = n === 3 ? ["saidPenalty"] : p.human ? ["saidDrewTile", game.drawn] : ["saidDraw"];
+  return true;
+}
+
+// Plays the move a computer player came up with, or draws if there is none.
+function computerTurn(move) {
+  if (game.over) return;
+  const p = current();
+  if (move) {
+    const opening = !p.melded;
+    game.table = move.table;
+    p.rack = move.rack;
+    p.melded = true;
+    game.passes = 0;
+    for (const id of move.placed) game.recent.add(id);
+    p.said = opening ? ["saidMeld", meldPoints(move.table, move.placed)] : ["saidPlay", move.placed.length];
+    if (!p.rack.length) { endGame(game.current); return; }
+  } else if (!drawFor(p)) {
+    return;
+  }
+  render();
+  later(nextTurn, PAUSE);
+}
+
+// The points of the sets made only of these tiles: what counts for a first meld.
+function meldPoints(table, placed) {
+  const mine = new Set(placed);
+  return table.filter(set => set.every(id => mine.has(id))).reduce((s, set) => s + (analyse(set)?.points ?? 0), 0);
+}
+
+// The tiles you have put on the table this turn.
+function placedNow() {
+  if (!myTurn()) return new Set();
+  const rack = new Set(me().rack);
+  return new Set(game.start.rack.filter(id => !rack.has(id)));
+}
+const tableChanged = () => JSON.stringify(game.table) !== JSON.stringify(game.start.table);
+
+function undoTurn() {
+  game.table = game.start.table.map(set => set.slice());
+  const rack = new Set(me().rack);
+  // Keep the rack in the order you gave it, with the tiles coming back at the end.
+  me().rack = me().rack.filter(id => game.start.rack.includes(id))
+    .concat(game.start.rack.filter(id => !rack.has(id)));
+  ui.selected.clear();
+}
+
+// The big button: Done if you have played tiles, or else draw (or pass).
+function finishTurn() {
+  if (!myTurn()) return;
+  const placed = placedNow();
+  if (!placed.size) {
+    const changed = tableChanged();
+    undoTurn();
+    if (!drawFor(me())) return;
+    game.status = changed ? ["nothingFromRack"] : me().said[0] === "saidPass" ? ["youPassed"] : ["youDrew", game.drawn];
+    return endMyTurn();
+  }
+  if (game.table.some(set => !analyse(set))) return message(t("errInvalid"));
+  const opening = !game.start.melded;
+  if (opening) {
+    const points = meldPoints(game.table, [...placed]);
+    if (points < 30) return message(t("errMeld", points));
+    me().said = ["saidMeld", points];
+  } else {
+    me().said = ["saidPlay", placed.size];
+  }
+  me().melded = true;
+  game.passes = 0;
+  game.drawn = null;
+  if (!me().rack.length) { stopClock(); endGame(0); return; }
+  game.status = null;
+  endMyTurn();
+}
+
+function endMyTurn() {
+  stopClock();
+  game.recent.clear();
+  ui.selected.clear();
+  render();
+  later(nextTurn, PAUSE);
+}
+
+function timeUp() {
+  if (!myTurn()) return;
+  closeDialog();
+  const moved = placedNow().size > 0 || tableChanged();
+  undoTurn();
+  if (!drawFor(me(), moved ? 3 : 1)) return;
+  game.status = [moved ? "timeUpPenalty" : "timeUp"];
+  endMyTurn();
+}
+
+function endGame(winner) {
+  game.over = true;
+  stopClock();
+  const values = game.players.map(p => rackValue(p.rack));
+  let points;
+  const blocked = winner === null;
+  if (blocked) {
+    const low = Math.min(...values);
+    winner = values.indexOf(low);
+    points = values.map(v => low - v);
+  } else {
+    points = values.map(v => -v);
+  }
+  points[winner] = -points.reduce((s, x, i) => i === winner ? s : s + x, 0);
+  sheet.push({points, winner});
+  game.players[winner].said = ["saidOut"];
+  game.status = [blocked ? "wonBlocked" : "wonOut", nameOf(game.players[winner])];
+  saveGame();
+  render();
+  later(() => showScores(game.status), 900);
+}
+
+// --- moving tiles --------------------------------------------------------------
+
+// Whether you may pick up this tile: your rack's always (to rearrange it); on
+// your turn also the table's, but before your first meld only your own new ones.
+function canMove(id) {
+  if (!game || game.over) return false;
+  if (me().rack.includes(id)) return true;
+  if (!myTurn()) return false;
+  return game.start.melded || placedNow().has(id);
+}
+
+// Moves tiles to a set ({set: i, at}), a new set ({set: "new"}) or the rack
+// ({rack: true, at}); `at` counts the tiles there that aren't moving. A run
+// that loses a tile from its middle falls apart in two.
+function moveTiles(ids, target) {
+  const moving = new Set(ids);
+  if (target.rack) {
+    if (ids.some(id => !me().rack.includes(id) && !(myTurn() && game.start.rack.includes(id)))) return warn("errBack");
+  } else {
+    if (!myTurn()) return;
+    if (target.set !== "new" && !game.start.melded) {
+      const placed = placedNow();
+      if (game.table[target.set].some(id => !placed.has(id) && !moving.has(id))) return warn("errLocked");
+    }
+  }
+  const rack = me().rack.filter(id => !moving.has(id));
+  const table = [];
+  game.table.forEach((set, i) => {
+    let rest = set.filter(id => !moving.has(id));
+    if (i === target.set) {
+      rest.splice(Math.min(target.at, rest.length), 0, ...ids);
+      table.push(normalize(rest));
+      return;
+    }
+    if (rest.length === set.length) { table.push(set); return; }
+    if (analyse(set)?.run) {
+      let piece = [];
+      for (const id of set) {
+        if (moving.has(id)) { if (piece.length) table.push(piece); piece = []; } else piece.push(id);
+      }
+      if (piece.length) table.push(piece);
+    } else if (rest.length) {
+      table.push(rest);
+    }
+  });
+  if (target.set === "new") table.push(normalize(ids));
+  if (target.rack) rack.splice(Math.min(target.at, rack.length), 0, ...ids);
+  game.table = table;
+  me().rack = rack;
+  ui.selected.clear();
+  if (game.drawn !== null && !rack.includes(game.drawn)) game.drawn = null;
+  if (myTurn()) saveGame();
+  render();
+}
+
+function sortRack(byColour) {
+  const key = id => TILES[id].joker ? [99, 99] : byColour ? [TILES[id].c, TILES[id].v] : [TILES[id].v, TILES[id].c];
+  me().rack.sort((a, b) => { const [x, y] = [key(a), key(b)]; return x[0] - y[0] || x[1] - y[1]; });
+  if (myTurn()) saveGame();
+  render();
+}
+
+// --- drawing the page ------------------------------------------------------------
+
+const JOKER_FACE = `<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="7" cy="8" r="1.3" fill="currentColor"/><circle cx="13" cy="8" r="1.3" fill="currentColor"/><path d="M5.8 11.6q4.2 4.6 8.4 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+
+function tileEl(id, rep) {
+  const tile = TILES[id], el = document.createElement("div");
+  el.className = `tile k${tile.c}`;
+  el.dataset.id = id;
+  if (tile.joker) {
+    el.innerHTML = JOKER_FACE + (rep ? `<span class="rep">${rep.v}</span>` : "");
+    el.title = rep ? `${t("joker")}: ${t("tileName", rep.c, rep.v)}` : t("joker");
+  } else {
+    el.textContent = tile.v;
+  }
+  el.setAttribute("aria-label", tileName(id));
+  return el;
+}
+function backEl() {
+  const el = document.createElement("div");
+  el.className = "tile back";
+  return el;
+}
+
+function render() {
+  if (!game) return;
+  if (ui.press?.dragging) { ui.pendingRender = true; return; }
+  ui.pendingRender = false;
+  const mine = myTurn(), placed = placedNow();
+
+  for (const seat of ["left", "top", "right"]) {
+    const el = $(`#seat-${seat}`), p = game.players.find(p => p.seat === seat);
+    el.hidden = !p;
+    if (!p) continue;
+    el.classList.toggle("active", !game.over && current() === p);
+    el.querySelector(".name").textContent = p.name;
+    el.querySelector(".count").textContent = t("tiles", p.rack.length);
+    el.querySelector(".said").textContent = say(p.said);
+    // Face down while the game is on; face up once it is over.
+    el.querySelector(".hand").replaceChildren(...p.rack.map(id => game.over ? tileEl(id) : backEl()));
+  }
+  const bottom = $("#seat-bottom");
+  bottom.classList.toggle("active", mine);
+  bottom.querySelector(".name").textContent = t("you");
+  bottom.querySelector(".said").textContent = say(me().said);
+
+  const table = $("#table");
+  table.replaceChildren();
+  game.table.forEach((set, i) => {
+    const el = document.createElement("div"), a = analyse(set);
+    el.className = "set";
+    el.dataset.set = i;
+    if (!a) el.classList.add("bad");
+    if (mine && !game.start.melded && set.some(id => !placed.has(id))) el.classList.add("locked");
+    set.forEach((id, j) => {
+      const tile = tileEl(id, a?.reps[j]);
+      if (placed.has(id)) tile.classList.add("mine");
+      if (game.recent.has(id)) tile.classList.add("recent");
+      if (ui.selected.has(id)) tile.classList.add("sel");
+      if (canMove(id)) tile.classList.add("can");
+      el.append(tile);
+    });
+    table.append(el);
+  });
+  if (mine) {
+    const el = document.createElement("div");
+    el.className = "newset";
+    el.textContent = "+ " + t("newSet");
+    table.append(el);
+  } else if (!game.table.length) {
+    const el = document.createElement("div");
+    el.className = "empty-table";
+    el.textContent = t("emptyTable");
+    table.append(el);
+  }
+
+  $("#rack").replaceChildren(...me().rack.map(id => {
+    const tile = tileEl(id);
+    if (id === game.drawn) tile.classList.add("new");
+    if (ui.selected.has(id)) tile.classList.add("sel");
+    if (!game.over) tile.classList.add("can");
+    return tile;
+  }));
+
+  const go = $("#go");
+  go.textContent = placed.size ? t("done") : game.pool.length ? t("draw") : t("pass");
+  go.disabled = !mine;
+  $("#reset").disabled = !mine || (!placed.size && !tableChanged());
+  $("#sort-num").disabled = $("#sort-color").disabled = game.over;
+
+  renderStatus();
+  $("#pool").textContent = t("pool", game.pool.length);
+  for (const b of document.querySelectorAll("[data-act=opp]")) b.setAttribute("aria-checked", Number(b.dataset.n) === settings.opponents);
+  requestAnimationFrame(layoutHands);
+}
+
+function renderStatus() {
+  const el = $("#status");
+  if (Date.now() < ui.warnUntil) return;
+  el.classList.remove("warn");
+  let text = say(game.status);
+  if (!text && myTurn()) {
+    text = !game.start.melded ? t("yourFirst", meldPoints(game.table, [...placedNow()]))
+         : game.pool.length ? t("yourTurn") : t("yourTurnEmpty");
+  }
+  if (!text && !game.over) text = t("theirTurn", current().name);
+  el.textContent = text;
+}
+
+// A short warning in the status bar, for a move that isn't allowed.
+function warn(key) {
+  const el = $("#status");
+  el.textContent = t(key);
+  el.classList.add("warn");
+  ui.warnUntil = Date.now() + 3500;
+  later(() => { ui.warnUntil = 0; if (game) renderStatus(); }, 3600);
+}
+
+// The opponents' tiles overlap as much as they must to fit along their side.
+function layoutHands() {
+  for (const hand of document.querySelectorAll(".seat:not([hidden]) .hand")) {
+    const tiles = [...hand.children];
+    if (!tiles.length) continue;
+    const vertical = hand.classList.contains("v");
+    const w = tiles[0].offsetWidth, h = tiles[0].offsetHeight;
+    const room = vertical ? hand.clientHeight : hand.clientWidth;
+    const step = tiles.length > 1 ? Math.max(3, Math.min(w + 2, (room - w) / (tiles.length - 1))) : 0;
+    const start = Math.max(0, (room - (step * (tiles.length - 1) + w)) / 2);
+    tiles.forEach((tile, i) => {
+      if (vertical) {
+        // Turned a quarter, a tile is w tall and h wide; place its box so that shows where it should.
+        tile.style.left = `${(hand.clientWidth - w) / 2}px`;
+        tile.style.top = `${start + i * step + (w - h) / 2}px`;
+      } else {
+        tile.style.left = `${start + i * step}px`;
+        tile.style.top = "0";
+      }
+    });
+  }
+}
+addEventListener("resize", () => requestAnimationFrame(layoutHands));
+
+// --- the clock -----------------------------------------------------------------
+
+let clockTimer = 0;
+function startClock() {
+  stopClock();
+  if (!settings.timer) return;
+  game.deadline = Date.now() + TURN_SECONDS * 1000;
+  const tick = () => {
+    const left = Math.max(0, Math.ceil((game.deadline - Date.now()) / 1000));
+    $("#clock").textContent = `⏱ ${left}`;
+    if (left <= 0) { stopClock(); timeUp(); }
+  };
+  $("#clock").hidden = false;
+  tick();
+  clockTimer = setInterval(tick, 250);
+}
+function stopClock() {
+  clearInterval(clockTimer);
+  clockTimer = 0;
+  $("#clock").hidden = true;
+}
+
+// --- dragging and tapping tiles ----------------------------------------------------
+
+// Where a point on the page would drop tiles: on a set, the new-set box or the
+// table (a new set), or your rack.
+function targetAt(x, y, ids) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  const set = el.closest(".set");
+  if (set) return {set: Number(set.dataset.set), at: indexAt(set, x, y, ids), el: set};
+  if (el.closest(".newset, #table")) return myTurn() ? {set: "new", el: $(".newset")} : null;
+  if (el.closest("#seat-bottom")) return {rack: true, at: indexAt($("#rack"), x, y, ids), el: $("#rack")};
+  return null;
+}
+// The place among the tiles in a box (leaving out those being moved) that a
+// point is at, reading the rows like text.
+function indexAt(box, x, y, ids) {
+  const tiles = [...box.querySelectorAll(".tile")].filter(el => !ids.includes(Number(el.dataset.id)));
+  const i = tiles.findIndex(el => {
+    const r = el.getBoundingClientRect();
+    return y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+  });
+  return i < 0 ? tiles.length : i;
+}
+
+const felt = $("#felt");
+felt.addEventListener("pointerdown", e => {
+  if (e.button !== 0 || !game || !$("#layer").hidden) return;
+  const tile = e.target.closest(".tile[data-id]");
+  if (!tile || !tile.closest("#rack, #table")) return;
+  const id = Number(tile.dataset.id);
+  if (!canMove(id)) return;
+  e.preventDefault();
+  ui.press = {id, x: e.clientX, y: e.clientY, pointerId: e.pointerId, dragging: false};
+});
+addEventListener("pointermove", e => {
+  const press = ui.press;
+  if (!press || e.pointerId !== press.pointerId) return;
+  if (!press.dragging) {
+    if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 6) return;
+    startDrag(press);
+  }
+  press.ghost.style.left = `${e.clientX - press.dx}px`;
+  press.ghost.style.top = `${e.clientY - press.dy}px`;
+  const target = targetAt(e.clientX, e.clientY, press.ids);
+  if (target?.el !== press.over) {
+    press.over?.classList.remove("over");
+    press.over = target?.el ?? null;
+    press.over?.classList.add("over");
+  }
+});
+addEventListener("pointerup", e => {
+  const press = ui.press;
+  if (!press || e.pointerId !== press.pointerId) return;
+  ui.press = null;
+  if (!press.dragging) { toggleSelected(press.id); return; }
+  endDrag(press);
+  const target = targetAt(e.clientX, e.clientY, press.ids);
+  if (target) moveTiles(press.ids, target);
+  else render();
+});
+addEventListener("pointercancel", e => {
+  const press = ui.press;
+  if (!press || e.pointerId !== press.pointerId) return;
+  ui.press = null;
+  if (press.dragging) { endDrag(press); render(); }
+});
+
+function startDrag(press) {
+  press.dragging = true;
+  // Drag everything selected if the tile is selected, else just this one.
+  const selected = [...document.querySelectorAll(".tile.sel")].map(el => Number(el.dataset.id));
+  press.ids = ui.selected.has(press.id) ? selected.filter(canMove) : [press.id];
+  const ghost = document.createElement("div");
+  ghost.className = "ghost";
+  for (const id of press.ids) ghost.append(tileEl(id));
+  document.body.append(ghost);
+  const grabbed = document.querySelector(`.tile[data-id="${press.id}"]`).getBoundingClientRect();
+  const width = parseFloat(getComputedStyle(ghost.firstChild).width);
+  press.dx = (press.x - grabbed.left) * width / grabbed.width + press.ids.indexOf(press.id) * (width + 2);
+  press.dy = (press.y - grabbed.top) * width / grabbed.width;
+  press.ghost = ghost;
+  for (const id of press.ids) document.querySelector(`.tile[data-id="${id}"]`)?.classList.add("dragging");
+}
+function endDrag(press) {
+  press.ghost.remove();
+  press.over?.classList.remove("over");
+  for (const el of document.querySelectorAll(".tile.dragging")) el.classList.remove("dragging");
+}
+
+function toggleSelected(id) {
+  if (ui.selected.has(id)) ui.selected.delete(id); else ui.selected.add(id);
+  document.querySelector(`.tile[data-id="${id}"]`)?.classList.toggle("sel", ui.selected.has(id));
+}
+
+// A tap next to the tiles: put the selected tiles there, or else let go of them.
+felt.addEventListener("click", e => {
+  if (!game || e.target.closest(".tile")) return;
+  if (!ui.selected.size) return;
+  const ids = [...document.querySelectorAll(".tile.sel")].map(el => Number(el.dataset.id)).filter(canMove);
+  const target = e.target.closest(".set, .newset, #rack") ? targetAt(e.clientX, e.clientY, ids) : null;
+  if (target && ids.length) {
+    moveTiles(ids, target.rack || target.set === "new" ? target : {...target, at: Infinity});
+  } else {
+    ui.selected.clear();
+    render();
+  }
+});
+
+// --- dialogs and menus ---------------------------------------------------------------
+
+const WARNING = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 31 29H1z" fill="#ffd400" stroke="#000"/><rect x="14.5" y="10" width="3" height="11" fill="#000"/><rect x="14.5" y="23" width="3" height="3" fill="#000"/></svg>`;
+
+let onEscape = null;
+function dialog(title, body, buttons, wide = false) {
+  const layer = $("#layer");
+  const box = document.createElement("div");
+  box.className = "window dialog" + (wide ? " wide" : "");
+  box.setAttribute("role", "dialog");
+  box.setAttribute("aria-modal", "true");
+  box.innerHTML = `<div class="titlebar"><span class="caption"></span><button type="button" class="tbtn close" aria-label="${t("close")}">✕</button></div><div class="body"></div><div class="buttons"></div>`;
+  box.querySelector(".caption").textContent = title;
+  const content = box.querySelector(".body");
+  if (typeof body === "string") content.innerHTML = body; else content.append(body);
+  const row = box.querySelector(".buttons");
+  for (const b of buttons) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "btn" + (b.default ? " default" : "");
+    el.textContent = b.label;
+    el.addEventListener("click", () => { closeDialog(); b.action?.(); });
+    row.append(el);
+  }
+  const cancel = buttons.find(b => b.cancel) ?? buttons[buttons.length - 1];
+  onEscape = () => { closeDialog(); cancel.action?.(); };
+  box.querySelector(".tbtn").addEventListener("click", onEscape);
+  layer.replaceChildren(box);
+  layer.hidden = false;
+  (row.querySelector(".default") ?? row.firstChild)?.focus();
+}
+function closeDialog() {
+  $("#layer").hidden = true;
+  $("#layer").replaceChildren();
+  onEscape = null;
+}
+function message(text) {
+  dialog("Tile Rummy", `<div class="msg">${WARNING}<p></p></div>`, [{label: t("ok"), default: true}]);
+  $("#layer .msg p").textContent = text;
+}
+
+function showScores(result) {
+  const box = document.createElement("div");
+  if (result) {
+    const p = document.createElement("p");
+    p.className = "result";
+    p.textContent = say(result);
+    box.append(p);
+  }
+  if (!sheet.length) {
+    box.append(t("noGames"));
+  } else {
+    const table = document.createElement("table");
+    table.className = "sheet";
+    const names = game.players.map(p => p.human ? t("you") : p.name);
+    const cell = (tag, text, cls) => { const c = document.createElement(tag); c.textContent = text; if (cls) c.className = cls; return c; };
+    const row = (cells) => { const tr = document.createElement("tr"); tr.append(...cells); return tr; };
+    const signed = n => n > 0 ? `+${n}` : String(n);
+    const head = document.createElement("thead"), body = document.createElement("tbody"), foot = document.createElement("tfoot");
+    head.append(row([cell("th", ""), ...names.map(n => cell("th", n))]));
+    sheet.forEach((g, i) => body.append(row([cell("td", t("game", i + 1)),
+      ...g.points.map((n, j) => cell("td", signed(n), j === g.winner ? "win" : n < 0 ? "neg" : ""))])));
+    foot.append(row([cell("td", t("total")), ...names.map((_, j) => cell("td", signed(sheet.reduce((s, g) => s + g.points[j], 0))))]));
+    foot.append(row([cell("td", t("wins")), ...names.map((_, j) => cell("td", String(sheet.filter(g => g.winner === j).length)))]));
+    table.append(head, body, foot);
+    box.append(table);
+  }
+  const buttons = game.over
+    ? [{label: t("next"), default: true, action: () => newGame(false)}, {label: t("close"), cancel: true}]
+    : [{label: t("ok"), default: true}];
+  dialog(t("scores").replace("...", ""), box, buttons);
+}
+
+function showOptions() {
+  const form = document.createElement("form");
+  const radio = (name, value, label, checked) =>
+    `<label><input type="radio" name="${name}" value="${value}"${checked ? " checked" : ""}> ${label}</label>`;
+  form.innerHTML = `
+    <fieldset><legend>${t("optOpp")}</legend>
+      ${[1, 2, 3].map(n => radio("opponents", n, t("opp" + n), settings.opponents === n)).join("")}
+      <p class="note">${t("restartNote")}</p></fieldset>
+    <fieldset><legend>${t("optLevel")}</legend>
+      ${LEVELS.map(level => radio("level", level, t(level), settings.level === level)).join("")}</fieldset>
+    <fieldset><legend>${t("optLang")}</legend>
+      ${radio("lang", "nl", "Nederlands", lang === "nl")}${radio("lang", "en", "English", lang === "en")}</fieldset>
+    <label><input type="checkbox" name="timer"${settings.timer ? " checked" : ""}> ${t("optTimer")}</label>`;
+  form.addEventListener("submit", e => e.preventDefault());
+  dialog(t("options").replace("...", ""), form, [
+    {label: t("ok"), default: true, action: () => {
+      const data = new FormData(form);
+      const opponents = Number(data.get("opponents"));
+      settings.level = data.get("level");
+      const timer = data.get("timer") === "on";
+      if (timer !== settings.timer) {
+        settings.timer = timer;
+        if (myTurn()) { if (timer) startClock(); else stopClock(); }
+      }
+      saveSettings();
+      if (data.get("lang") !== lang) setLanguage(data.get("lang"));
+      if (opponents !== settings.opponents) setOpponents(opponents);
+    }},
+    {label: t("cancel"), cancel: true},
+  ]);
+}
+
+function setOpponents(n) {
+  settings.opponents = n;
+  saveSettings();
+  newGame(true);
+}
+
+// New game, from the menu or F2: ask first if there are scores to lose.
+function askNewGame(then = () => newGame(true)) {
+  if (!sheet.length && (!game || game.over || !game.players.some(p => p.melded))) { then(); return; }
+  dialog("Tile Rummy", `<div class="msg">${WARNING}<p>${t("newGameAsk")}</p></div>`,
+         [{label: t("yes"), default: true, action: then}, {label: t("no"), cancel: true}]);
+}
+
+function openMenu(name) {
+  for (const b of document.querySelectorAll(".menubar .mb")) b.classList.toggle("open", b.dataset.menu === name);
+  for (const m of document.querySelectorAll(".menu")) {
+    const open = m.id === `menu-${name}`;
+    m.hidden = !open;
+    if (open) m.style.left = `${document.querySelector(`.mb[data-menu=${name}]`).offsetLeft}px`;
+  }
+  ui.menu = name;
+}
+function closeMenu() { if (ui.menu) openMenu(null); ui.menu = null; }
+
+for (const b of document.querySelectorAll(".menubar .mb")) {
+  b.addEventListener("click", e => { e.stopPropagation(); ui.menu === b.dataset.menu ? closeMenu() : openMenu(b.dataset.menu); });
+  b.addEventListener("pointerenter", () => { if (ui.menu && ui.menu !== b.dataset.menu) openMenu(b.dataset.menu); });
+}
+addEventListener("click", e => { if (ui.menu && !e.target.closest(".menu")) closeMenu(); });
+for (const item of document.querySelectorAll(".menu [data-act]")) {
+  item.addEventListener("click", () => {
+    closeMenu();
+    const act = item.dataset.act;
+    if (act === "new") askNewGame();
+    else if (act === "opp") { const n = Number(item.dataset.n); if (n !== settings.opponents) askNewGame(() => setOpponents(n)); }
+    else if (act === "scores") showScores(null);
+    else if (act === "options") showOptions();
+    else if (act === "rules") dialog(t("rules"), t("rulesHtml"), [{label: t("ok"), default: true}], true);
+    else if (act === "about") dialog(t("about"), `${t("aboutText")}<p>${t("solver" + brain.solver)}</p>`, [{label: t("ok"), default: true}]);
+  });
+}
+
+addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if (onEscape) onEscape(); else if (ui.menu) closeMenu();
+    else if (myTurn() && ui.selected.size) { ui.selected.clear(); render(); }
+    return;
+  }
+  if (e.key === "F2") { e.preventDefault(); askNewGame(); return; }
+  if (e.key === "F1") { e.preventDefault(); dialog(t("rules"), t("rulesHtml"), [{label: t("ok"), default: true}], true); return; }
+  if (onEscape || e.target.closest("input, button")) return;
+  if (e.key === "Enter") finishTurn();
+});
+
+$("#go").addEventListener("click", finishTurn);
+$("#reset").addEventListener("click", () => { if (myTurn()) { undoTurn(); saveGame(); render(); } });
+$("#sort-num").addEventListener("click", () => sortRack(false));
+$("#sort-color").addEventListener("click", () => sortRack(true));
+
+// --- language --------------------------------------------------------------------
+
+function setLanguage(name) {
+  lang = name;
+  if (!TEST) try { localStorage.setItem("solfege.lang", name); } catch {}
+  document.documentElement.lang = name;
+  for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t);
+  for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
+  if (game) { game.players[0].name = t("you"); render(); }
+}
+for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLanguage(b.dataset.lang));
+
+setLanguage(lang);
+if (!resumeGame()) newGame(true);
+
+if (!TEST && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(e => console.warn(e));
+}
+</script>
+</body>
+</html>
