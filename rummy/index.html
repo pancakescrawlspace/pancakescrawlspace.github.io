@@ -74,22 +74,22 @@
   [hidden] { display: none !important; }
 
   /* --- the page around the game --- */
-  .app { display: flex; flex-direction: column; margin: auto; }
-  .topbar { position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 8px; user-select: none; }
-  #menu-button { display: grid; place-items: center; flex: none; width: 34px; height: 30px; padding: 0; border: none; border-radius: 6px; background: none; cursor: pointer; }
+  .app { position: relative; display: flex; flex-direction: column; margin: auto; }
+  /* No bar: two small patches in the page's colour, on the corners of the table. */
+  .topbar { position: absolute; z-index: 20; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 4px; pointer-events: none; user-select: none; }
+  .topbar > button, .topbar > .lang, .topbar > .menu { pointer-events: auto; }
+  #menu-button { display: grid; place-items: center; flex: none; width: 34px; height: 30px; padding: 0; border: none; border-radius: 6px; background: var(--bg); cursor: pointer; }
   #menu-button svg { width: 18px; height: 18px; }
   #menu-button:hover, #menu-button[aria-expanded=true] { background: var(--accent-soft); }
   #menu-button:focus-visible { outline: 2px solid var(--accent); }
-  .brand { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .topbar .spacer { flex: 1; }
-  .topbar .lang { display: flex; flex: none; gap: 2px; }
+  .topbar .lang { display: flex; flex: none; align-items: center; gap: 2px; height: 30px; padding: 0 3px; border-radius: 6px; background: var(--bg); }
   .topbar .lang button { padding: 2px 6px; border: none; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
   .topbar .lang button[aria-pressed=true] { background: var(--accent-soft); color: var(--text); }
   .menu {
     position: absolute;
     z-index: 30;
     top: 100%;
-    left: 8px;
+    left: 4px;
     min-width: 190px;
     padding: 4px;
     border: 1px solid var(--line);
@@ -147,8 +147,10 @@
   }
   .seat { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 0; padding: 6px; }
   #seat-top { grid-area: 1 / 2 / 2 / 3; flex-direction: column; }
-  #seat-left { grid-area: 1 / 1 / 3 / 2; flex-direction: column; }
-  #seat-right { grid-area: 1 / 3 / 3 / 4; flex-direction: column; }
+  /* The players on the sides start below the patches. A lone opponent at the top keeps clear of them too. */
+  #seat-left { grid-area: 1 / 1 / 3 / 2; flex-direction: column; padding-top: 40px; }
+  #seat-right { grid-area: 1 / 3 / 3 / 4; flex-direction: column; padding-top: 40px; }
+  #seat-left[hidden] ~ #seat-top { padding-inline: 84px; }
   #seat-bottom { grid-area: 3 / 1 / 4 / 4; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 6px 14px; padding: 4px 8px 8px; }
   .who { display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 9em; }
   .who .name { padding: 0 6px; border-radius: 6px; font-weight: 600; }
@@ -223,6 +225,7 @@
     .controls .wide { grid-column: auto; }
     .controls .btn { min-width: 0; padding: 4px 6px; font-size: 13px; line-height: 1.15; white-space: normal; }
     .seat { padding: 4px 3px; }
+    #seat-left, #seat-right { padding-top: 40px; }
     #table { gap: 8px 10px; padding: 8px 4px; }
   }
 
@@ -303,8 +306,6 @@
     <button type="button" id="menu-button" aria-label="Menu" title="Menu" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">
       <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
-    <span class="brand">Tile Rummy</span>
-    <span class="spacer"></span>
     <span class="lang" role="group" aria-label="Taal / Language">
       <button type="button" data-lang="nl" lang="nl" title="Nederlands">NL</button>
       <button type="button" data-lang="en" lang="en" title="English">EN</button>
