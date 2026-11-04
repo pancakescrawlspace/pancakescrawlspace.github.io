@@ -3,7 +3,7 @@
   "short_name": "solfège duo",
   "description": "Met z'n tweeën gehoor trainen: de een speelt een noot, de ander zoekt hem op het klavier.",
   "lang": "nl",
-  "id": "./",
+  "id": "/solfege-poc/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
