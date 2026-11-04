@@ -265,6 +265,8 @@
   .dialog .body p { margin: 0 0 10px; }
   .dialog .body h3 { margin: 12px 0 4px; font-size: 1em; }
   .dialog .body ul { margin: 0 0 8px; padding-left: 18px; }
+  .field { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .field input, input.link { flex: 1; width: 100%; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
   .dialog .buttons { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 12px 12px; }
   fieldset { margin: 0 0 10px; padding: 6px 10px 8px; border: 1px solid var(--line); border-radius: 8px; }
   legend { padding: 0 4px; color: var(--muted); }
@@ -287,6 +289,9 @@
     <div class="menu" id="menu" role="menu" aria-label="Menu" hidden>
       <button type="button" role="menuitem" data-act="new"><span data-t="newGame"></span><span>F2</span></button>
       <button type="button" role="menuitem" data-act="clear"><span data-t="clearScore"></span></button>
+      <button type="button" role="menuitem" data-act="online" hidden><span data-t="playOnline"></span></button>
+      <button type="button" role="menuitem" data-act="invite" hidden><span data-t="showInvite"></span></button>
+      <button type="button" role="menuitem" data-act="own" hidden><span data-t="ownGame"></span></button>
       <hr>
       <button type="button" role="menuitem" data-act="options"><span data-t="options"></span></button>
       <hr>
@@ -351,7 +356,7 @@ const RULES_NL = `
 <li>Met het toetsenbord: de cijfers 1 tot en met 7 kiezen een kolom; of ga met de pijltjes naar een kolom en druk op Enter.</li>
 <li>De laatste zet heeft een stipje in de schijf.</li>
 </ul>
-<p>In <i>Menu → Opties</i> kies je hoe sterk de computer speelt en wie er begint. Oranje is altijd jij, blauw de computer.</p>`;
+<p>In <i>Menu → Opties</i> kies je hoe sterk de computer speelt en wie er begint. Oranje is altijd jij, blauw de computer. In een online spel heeft ieder een eigen kleur, naast zijn naam.</p>`;
 
 const RULES_EN = `
 <p>Take turns dropping a disc into a column; it falls to the lowest free cell. The first player with four of their discs in a row wins: across, up or diagonally. If the board fills up without four in a row, it is a draw.</p>
@@ -361,13 +366,26 @@ const RULES_EN = `
 <li>With the keyboard: the digits 1 to 7 choose a column; or go to a column with the arrow keys and press Enter.</li>
 <li>The last move has a dot in its disc.</li>
 </ul>
-<p>In <i>Menu → Options</i> you choose how strongly the computer plays and who starts. Orange is always you, and blue the computer.</p>`;
+<p>In <i>Menu → Options</i> you choose how strongly the computer plays and who starts. Orange is always you, and blue the computer. In an online game each player has a colour, next to their name.</p>`;
 
 const STRINGS = {
   nl: {
     title: "Vier op een rij", newGame: "Nieuw spel", clearScore: "Score op nul",
     options: "Opties...", rules: "Spelregels", about: "Over Vier op een rij...", ok: "OK", cancel: "Annuleren", close: "Sluiten",
     you: "Jij", computer: "Computer", opponent: "Tegenstander", yes: "Ja", no: "Nee",
+    googleNote: "Om een spel aan te maken, moet je inloggen met een Google-account dat op de lijst staat.", googleSignIn: "Inloggen met Google",
+    creatorNotListed: uid => `Dit Google-account staat niet op de lijst van wie spellen mag aanmaken. Vraag de beheerder het toe te voegen. Je nummer is: ${uid}`,
+    secretTitle: "Spellen aanmaken", secretNote: "Op deze server mag je alleen een spel aanmaken als je het wachtwoord kent. Dat hoef je maar één keer in te vullen.", secretLabel: "Wachtwoord",
+    secretWrong: "Dat wachtwoord klopt niet.", secretTooMany: "Te vaak geprobeerd. Wacht een minuut.", tooManyRooms: "De server heeft al te veel spellen.",
+    playOnline: "Online spelen...", showInvite: "Uitnodiging...", ownGame: "Terug naar je eigen spel", yourName: "Je naam",
+    onlineNote: "Je maakt een spel aan en krijgt een link voor je tegenstander.", onlineCreate: "Aanmaken", onlineJoin: "Meedoen",
+    onlineFailed: "Dat lukte niet: de multiplayer-server reageert niet goed.",
+    inviteNote: "Stuur deze link naar je tegenstander. Wie hem als eerste opent, krijgt de plaats.", copyLink: "Kopiëren",
+    joinNote: host => `${host} nodigt je uit voor een spel.`, waitingToJoin: "Wachten tot je tegenstander meedoet...",
+    offline: "De verbinding is weg; er wordt opnieuw geprobeerd...",
+    inviteIsYours: "Deze uitnodiging is voor je tegenstander, en deze browser is al jouw kant van het spel. Om het op één computer uit te proberen: open de link in een andere browser of een privévenster.",
+    seatTaken: "Deze uitnodiging is al gebruikt.", inviteNotValid: "Deze uitnodiging klopt niet.",
+    roomGone: "Dit spel bestaat niet meer.", notInRoom: "Je doet niet mee aan dit spel. Vraag om een uitnodiging.",
     yourTurn: "Jij bent aan de beurt: kies een kolom.", thinking: "De computer denkt na...", waiting: name => `Wachten op ${name}...`,
     youWon: "Jij hebt gewonnen!", youLost: "De computer heeft gewonnen.", otherWon: name => `${name} heeft gewonnen.`, draw: "Gelijkspel: het bord is vol.",
     afterGame: "Begin een nieuw spel wanneer je wilt.", waitNext: name => `${name} begint het volgende spel.`,
@@ -385,6 +403,19 @@ const STRINGS = {
     title: "Four in a Row", newGame: "New game", clearScore: "Clear the score",
     options: "Options...", rules: "Rules", about: "About Four in a Row...", ok: "OK", cancel: "Cancel", close: "Close",
     you: "You", computer: "Computer", opponent: "Opponent", yes: "Yes", no: "No",
+    googleNote: "To create a game, sign in with a Google account that is on the list.", googleSignIn: "Sign in with Google",
+    creatorNotListed: uid => `This Google account isn't on the list of those who may create games. Ask whoever runs this to add it. Your number is: ${uid}`,
+    secretTitle: "Creating games", secretNote: "On this server you can only create a game if you know the password. You only have to enter it once.", secretLabel: "Password",
+    secretWrong: "That password isn't right.", secretTooMany: "Too many tries. Please wait a minute.", tooManyRooms: "The server has too many games already.",
+    playOnline: "Play online...", showInvite: "Invitation...", ownGame: "Back to your own game", yourName: "Your name",
+    onlineNote: "You create a game, and get a link for your opponent.", onlineCreate: "Create", onlineJoin: "Join",
+    onlineFailed: "That didn't work: the multiplayer server isn't answering properly.",
+    inviteNote: "Send this link to your opponent. Whoever opens it first gets the seat.", copyLink: "Copy",
+    joinNote: host => `${host} invites you to a game.`, waitingToJoin: "Waiting for your opponent to join...",
+    offline: "The connection is gone; trying again...",
+    inviteIsYours: "This invitation is for your opponent, and this browser is already your side of the game. To try it on one computer, open the link in another browser or a private window.",
+    seatTaken: "This invitation has already been used.", inviteNotValid: "This invitation isn't valid.",
+    roomGone: "This game no longer exists.", notInRoom: "You aren't in this game. Ask for an invitation.",
     yourTurn: "Your turn: choose a column.", thinking: "The computer is thinking...", waiting: name => `Waiting for ${name}...`,
     youWon: "You won!", youLost: "The computer won.", otherWon: name => `${name} won.`, draw: "A draw: the board is full.",
     afterGame: "Start a new game whenever you like.", waitNext: name => `${name} starts the next game.`,
@@ -469,16 +500,31 @@ function firstRecord() {
 }
 
 const keep = record => { if (KEEP) try { localStorage.setItem(STORE + "room", JSON.stringify(record)); } catch {} };
-const room = createLocalRoom({record: firstRecord(), keep, delay: TEST ? Number(params.get("delay") ?? 0) : 0})(0);
-if (TEST) window.gameRoom = room;
+let room = null;                         // this browser's own room, or one on the multiplayer server
+let stopWatching = null;
+function enterRoom(newRoom) {
+  stopWatching?.();
+  room = newRoom;
+  if (TEST) window.gameRoom = room;
+  record = null;
+  shown = [];
+  ui.sent = ui.thought = -1;
+  $("#discs").replaceChildren();
+  stopWatching = room.watch(receive);
+  room.onConnection = connected => { ui.offline = !connected; render(); };
+  showMenuItems();
+}
+function startOwnGame() {
+  enterRoom(createLocalRoom({record: firstRecord(), keep, delay: TEST ? Number(params.get("delay") ?? 0) : 0})(0));
+}
 
-const ui = {sent: -1, thought: -1};     // the turn a move was last sent on, or thought about
+const ui = {sent: -1, thought: -1, offline: false};     // the turn a move was last sent on, or thought about
 let record = null;                       // the record as last received
 let shown = [];                          // the moves whose discs are on the board
 
 const seatName = seat => seat === room.mySeat ? t("you")
   : record.seats[seat].kind === "computer" ? t("computer") : record.seats[seat].name ?? t("opponent");
-const myTurn = () => record && !outcome(record.state).over && record.current === room.mySeat;
+const myTurn = () => record && record.started !== false && !outcome(record.state).over && record.current === room.mySeat;
 
 // Every record comes in here: at the start, after a move of ours, and from
 // wherever else a move can come from. It is checked, drawn and followed up.
@@ -524,6 +570,7 @@ function dropInto(column) {
 
 // The first seat of the next game, by the option.
 function nextFirst(state) {
+  if (room.online) return 1 - state.first;          // taking turns: the option is about the computer
   if (settings.starts === "you") return room.mySeat;
   if (settings.starts === "computer") return 1 - room.mySeat;
   return state.moves.length ? 1 - state.first : state.first;
@@ -537,12 +584,13 @@ function startNext() {
   const next = nextGame(state, first);
   if (outcome(state).over) {
     if (canStartNext()) room.play({state: next, current: first}, current === room.mySeat ? {} : {forSeat: current}).catch(e => console.warn(e));
-  } else {
+  } else if (!room.online) {                        // online, a game in progress can't just be restarted
     room.restart({state: next, current: first});
   }
 }
 
 function askNewGame() {
+  if (room.online && !outcome(record.state).over) return;
   if (outcome(record.state).over || !record.state.moves.length) { startNext(); return; }
   dialog(t("title"), `<p>${t("giveUp")}</p>`, [
     {label: t("yes"), default: true, action: startNext},
@@ -634,8 +682,9 @@ function render() {
       : record.seats[winner].kind === "computer" ? t("youLost") : t("otherWon", seatName(winner));
     status = canStartNext() ? t("afterGame") : t("waitNext", seatName(record.current));
   } else {
-    said = mine ? t("yourTurn") : current.kind === "computer" ? t("thinking") : t("waiting", seatName(record.current));
-    status = said;
+    said = record.started === false ? t("waitingToJoin") : mine ? t("yourTurn")
+      : current.kind === "computer" ? t("thinking") : t("waiting", seatName(record.current));
+    status = ui.offline ? t("offline") : said;
   }
   $("#said").textContent = said;
   $("#status").textContent = status;
@@ -647,7 +696,7 @@ function render() {
   const again = $("#again");
   const wasFocus = over && !again.classList.contains("default");
   again.classList.toggle("default", over);
-  again.disabled = over && !canStartNext();
+  again.disabled = over ? !canStartNext() : Boolean(room.online);
   if (wasFocus && !again.disabled && !$("#layer").childElementCount) again.focus();
 }
 
@@ -745,6 +794,9 @@ for (const item of document.querySelectorAll(".menu button")) {
     const act = item.dataset.act;
     if (act === "new") askNewGame();
     else if (act === "clear") room.restart({state: {...record.state, wins: [0, 0], draws: 0}, current: record.current});
+    else if (act === "online") askOnline();
+    else if (act === "invite") showInvite();
+    else if (act === "own") location.href = location.pathname + (TEST ? "?test" : "");
     else if (act === "options") showOptions();
     else if (act === "rules") showRules();
     else if (act === "about") dialog(t("about").replace("...", ""), t("aboutHtml"), [{label: t("ok"), default: true}]);
@@ -771,6 +823,183 @@ addEventListener("keydown", e => {
   }
 });
 
+// --- playing online -----------------------------------------------------------
+//
+// Through the multiplayer layer (../multiplayer/client.js): on a multiplayer server if one
+// serves this page, or else on Firebase. Everything above works the same with its room as
+// with the local one. Without the layer, such as offline, none of this is offered.
+let layer = null, serverThere = false;
+const loadLayer = async () => {
+  layer ??= await import("../multiplayer/client.js");
+  return layer;
+};
+const connectToLayer = async () => (await loadLayer()).connect({
+  game: "connect4",
+  firebase: TEST && params.get("firebase") === "emulator" ? (params.has("unlisted") ? {emulator: true, listOnSignIn: false} : "emulator") : undefined,
+  realProject: !TEST,
+  sessionName: TEST && params.get("session") ? `multiplayer.test.${params.get("session")}` : undefined,
+  page: location.origin + location.pathname + (TEST ? "?test" : ""),
+});
+const inviteKey = id => `${STORE}invite.${id}`;
+const addressFor = id => {
+  const url = new URL(location.href);
+  url.searchParams.set("room", id);
+  url.hash = "";
+  return url;
+};
+
+function showMenuItems() {
+  const online = Boolean(room?.online);
+  $('[data-act="online"]').hidden = !serverThere || online;
+  $('[data-act="own"]').hidden = !online;
+  $('[data-act="clear"]').hidden = online;
+  $('[data-act="invite"]').hidden = !online || !inviteOfThisRoom();
+}
+function inviteOfThisRoom() {
+  try { return room?.inviteLinks?.[1] ?? localStorage.getItem(inviteKey(room?.id)); } catch { return room?.inviteLinks?.[1] ?? null; }
+}
+
+// A form with one field for your name, for creating or joining.
+function askName(title, intro, action, buttonLabel) {
+  const form = document.createElement("form");
+  form.innerHTML = `<p></p><label class="field"><span>${t("yourName")}</span> <input name="name" maxlength="40" autocomplete="off"></label>`;
+  form.querySelector("p").textContent = intro;
+  const input = form.querySelector("input");
+  try { input.value = localStorage.getItem(STORE + "name") ?? ""; } catch {}
+  const go = () => {
+    const name = input.value.trim() || t("opponent");
+    if (KEEP) try { localStorage.setItem(STORE + "name", name); } catch {}
+    action(name);
+  };
+  form.addEventListener("submit", e => { e.preventDefault(); closeDialog(); go(); });
+  dialog(title, form, [{label: buttonLabel, default: true, action: go}, {label: t("cancel"), cancel: true}]);
+  input.focus();
+}
+
+function askOnline() {
+  askName(t("playOnline").replace("...", ""), t("onlineNote"), createOnline, t("onlineCreate"));
+}
+async function createOnline(name, retried = false) {
+  try {
+    const mp = await connectToLayer();
+    const state = newState(0);
+    const newRoom = await mp.create({seats: [{kind: "person", name}, {kind: "person"}], state, current: nextCurrent(state)});
+    if (KEEP) try { localStorage.setItem(inviteKey(newRoom.id), newRoom.inviteLinks[1]); } catch {}
+    history.pushState(null, "", addressFor(newRoom.id));
+    enterRoom(newRoom);
+    showInvite();
+  } catch (e) {
+    console.warn(e);
+    if (e.code === "secret-needed" && retried) message(t("creatorNotListed", (await connectToLayer()).uid?.() ?? ""));
+    else if (e.code === "secret-needed") askSecret(() => createOnline(name, true));
+    else message(t(e.code === "too-many-rooms" ? "tooManyRooms" : "onlineFailed"));
+  }
+}
+
+// A server with a secret only lets those who know it create games: asks once, and tries again.
+// On Firebase it takes a Google account on the list of creators instead.
+async function askSecret(retry) {
+  const mp = await connectToLayer();
+  if (mp.usesGoogle) {
+    dialog(t("secretTitle"), `<p data-google>${t("googleNote")}</p>`, [
+      {label: t("googleSignIn"), default: true, action: async () => {
+        try {
+          await mp.signIn();
+          retry();
+        } catch (e) {
+          console.warn(e);
+          message(t("onlineFailed"));
+        }
+      }},
+      {label: t("cancel"), cancel: true},
+    ]);
+    return;
+  }
+  const form = document.createElement("form");
+  form.innerHTML = `<p>${t("secretNote")}</p><label class="field"><span>${t("secretLabel")}</span> <input name="secret" type="password" autocomplete="off"></label>`;
+  form.addEventListener("submit", e => e.preventDefault());
+  const input = form.querySelector("input");
+  dialog(t("secretTitle"), form, [
+    {label: t("ok"), default: true, action: async () => {
+      try {
+        await (await connectToLayer()).signIn({secret: input.value});
+        retry();
+      } catch (e) {
+        console.warn(e);
+        message(t(e.code === "too-many-attempts" ? "secretTooMany" : e.code === "wrong-secret" ? "secretWrong" : "onlineFailed"));
+      }
+    }},
+    {label: t("cancel"), cancel: true},
+  ]);
+  input.focus();
+}
+
+function showInvite() {
+  const link = inviteOfThisRoom();
+  if (!link) return;
+  const box = document.createElement("div");
+  box.innerHTML = `<p>${t("inviteNote")}</p><input class="link" readonly>`;
+  const input = box.querySelector("input");
+  input.value = link;
+  dialog(t("showInvite").replace("...", ""), box, [
+    {label: t("copyLink"), default: true, action: () => {
+      navigator.clipboard?.writeText(link).catch(() => {});
+    }},
+    {label: t("close"), cancel: true},
+  ]);
+  input.select();
+}
+
+// An address with a room in it: join with the key after the #, or go back to a room you are in.
+async function openOnline(id) {
+  const fallBack = key => {
+    history.replaceState(null, "", location.pathname + (TEST ? `?test${params.get("session") ? `&session=${params.get("session")}` : ""}` : ""));
+    startOwnGame();
+    message(t(key));
+  };
+  try {
+    const client = await loadLayer();
+    const mp = await connectToLayer();
+    const invite = client.parseInvite(location.href);
+    if (!invite) { enterRoom(await mp.open(id)); return; }
+    const preview = await mp.preview(location.href);
+    const clearKey = () => history.replaceState(null, "", addressFor(id));
+    if (preview.joined) {
+      clearKey();
+      const own = await mp.open(id);
+      enterRoom(own);
+      // A session belongs to a browser: this is your own invitation, opened by you.
+      if (own.mySeat !== invite.seat) message(t("inviteIsYours"));
+      return;
+    }
+    const host = preview.seats.find(seat => seat.taken)?.name ?? t("opponent");
+    askName(t("title"), t("joinNote", host), async name => {
+      try {
+        const joined = await mp.join(location.href, {name});
+        clearKey();
+        enterRoom(joined);
+      } catch (e) {
+        console.warn(e);
+        fallBack(e.code === "seat-taken" ? "seatTaken" : "inviteNotValid");
+      }
+    }, t("onlineJoin"));
+  } catch (e) {
+    console.warn(e);
+    fallBack(e.code === "no-such-room" ? "roomGone" : e.code === "not-a-member" || e.code === "secret-needed" ? "notInRoom"
+      : e.code === "seat-taken" ? "seatTaken" : e.code === "wrong-key" ? "inviteNotValid" : "onlineFailed");
+  }
+}
+
+// Whether there are rooms to use, so that playing online can be offered.
+async function lookForServer() {
+  try {
+    serverThere = await (await loadLayer()).available("..", {realProject: !TEST});
+  } catch {
+    serverThere = false;              // no layer here, such as offline
+  }
+  showMenuItems();
+}
+
 // --- language ----------------------------------------------------------------
 
 function setLanguage(name) {
@@ -785,7 +1014,9 @@ function setLanguage(name) {
 for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLanguage(b.dataset.lang));
 
 setLanguage(lang);
-room.watch(receive);
+if (params.get("room")) openOnline(params.get("room"));
+else startOwnGame();
+if (location.protocol.startsWith("http")) lookForServer();
 
 if (!TEST && "serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(e => console.warn(e));
