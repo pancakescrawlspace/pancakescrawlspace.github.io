@@ -132,13 +132,6 @@
   #notice { margin: .5rem 0 0; }
 
   /* answering */
-  .tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--line); margin: -.25rem 0 1rem; }
-  .tabs button {
-    border: none; border-bottom: 2px solid transparent; border-radius: 0;
-    background: none; padding: .5rem .8rem; color: var(--muted);
-  }
-  .tabs button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-
   .keyboard-scroll { overflow-x: auto; padding-bottom: .25rem; }
   .keyboard {
     --key-min: 1.9rem;
@@ -179,25 +172,6 @@
   .key.right { background: var(--yes) !important; border-color: var(--yes) !important; color: #fff; }
   .legend { margin: .6rem 0 0; }
   .legend .dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; background: var(--accent); }
-
-  .intervals h3 { font-size: .9rem; color: var(--muted); font-weight: 600; margin: 0 0 .4rem; }
-  .intervals .group + .group { margin-top: 1rem; }
-  .interval-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: .4rem; }
-  .interval-grid button { text-align: left; line-height: 1.25; padding: .45rem .6rem; }
-  .interval-grid b { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .interval-grid span { font-size: .8rem; color: var(--muted); }
-  .interval-grid button.wrong { background: var(--no-soft); border-color: var(--no); }
-  .interval-grid button.right { background: var(--yes-soft); border-color: var(--yes); }
-
-  #type-form { display: flex; gap: .5rem; }
-  #answer {
-    flex: 1; min-width: 0;
-    padding: .5rem .6rem;
-    background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  .syntax { margin: .75rem 0 0; padding-left: 1.1rem; }
-  .syntax li + li { margin-top: .35rem; }
 
   /* history */
   #history { list-style: none; margin: 0; padding: 0; }
@@ -284,32 +258,8 @@
     </section>
 
     <section class="panel">
-      <div class="tabs" role="tablist">
-        <button type="button" role="tab" data-tab="keys" aria-selected="true" data-t="tabKeys"></button>
-        <button type="button" role="tab" data-tab="intervals" aria-selected="false" data-t="tabIntervals"></button>
-        <button type="button" role="tab" data-tab="type" aria-selected="false" data-t="tabType"></button>
-      </div>
-
-      <div data-panel="keys" role="tabpanel">
-        <div class="keyboard-scroll"><div class="keyboard" id="keyboard"></div></div>
-        <p class="legend muted small" data-t="legend"></p>
-      </div>
-
-      <div data-panel="intervals" role="tabpanel" class="intervals" id="intervals" hidden></div>
-
-      <div data-panel="type" role="tabpanel" hidden>
-        <form id="type-form" autocomplete="off">
-          <input type="text" id="answer" placeholder="sol, fis, eb5, 3-, -5 …"
-                 autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
-          <button type="submit" class="primary" data-t="check"></button>
-        </form>
-        <ul class="syntax small">
-          <li data-t="syntaxNote"></li>
-          <li data-t="syntaxInterval"></li>
-          <li data-t="syntaxDirection"></li>
-          <li data-t="syntaxCommands"></li>
-        </ul>
-      </div>
+      <div class="keyboard-scroll"><div class="keyboard" id="keyboard"></div></div>
+      <p class="legend muted small" data-t="legend"></p>
     </section>
 
     <section class="panel" id="history-panel" hidden>
@@ -404,8 +354,7 @@ const STRINGS = {
     scoreShown: "getoond",
     lede: "Luister naar een beginnoot en daarna een andere noot. Welke noot was de tweede?",
     welcome: `Elke ronde klinkt eerst de beginnoot en dan een tweede noot in de buurt. Antwoord door de tweede
-      noot op het klavier in te drukken, door het interval tussen de twee te kiezen of door de naam te typen.
-      Is het goed, dan begint de volgende ronde.`,
+      noot op het klavier in te drukken. Is het goed, dan begint de volgende ronde.`,
     welcomeSettings: `Met de instellingen hieronder kies je de beginnoot, hoe ver de tweede noot ervan af kan
       liggen en het geluid.`,
     start: "Start",
@@ -414,28 +363,9 @@ const STRINGS = {
     playSecond: "Tweede noot <kbd>P</kbd>",
     giveUp: "Toon antwoord <kbd>S</kbd>",
     next: "Volgende noot <kbd>N</kbd>",
-    tabKeys: "Klavier",
-    tabIntervals: "Interval",
-    tabType: "Typen",
     legend: `<span class="dot"></span> de beginnoot. Een toets laat zijn noot horen en antwoordt met precies die
       noot. Zonder alle twaalf noten antwoorden alleen de toetsen uit de toonladder van de beginnoot; de andere
       laten alleen hun noot horen.`,
-    answerLabel: "Noot of interval",
-    check: "Controleer",
-    syntaxNote: `<b>Een noot:</b> <code>fis</code>, <code>bes</code>, <code>es</code>, <code>as</code> enzovoort,
-      <code>c d e f g a b</code> met <code>#</code> of <code>b</code>, of de vaste do: <code>do re mi fa sol la
-      si</code>. Elk octaaf telt. Wil je precies zijn, zet het octaaf erachter: <code>d4</code>,
-      <code>eb5</code> (de centrale C is <code>c4</code>), of zoals in LilyPond <code>d'</code>,
-      <code>bes,</code>.`,
-    syntaxInterval: `<b>Een interval</b> vanaf de beginnoot: <code>2</code> is een grote secunde, <code>2-</code>
-      een kleine secunde, <code>4+</code> of <code>5-</code> de tritonus, <code>8</code> een octaaf. Bij 1, 4, 5
-      en 8 betekenen <code>+</code> en <code>-</code> overmatig en verminderd; bij de andere is <code>-</code>
-      klein, <code>--</code> verminderd en <code>+</code> overmatig.`,
-    syntaxDirection: `<b>Een richting:</b> <code>+</code> of <code>-</code> vooraan betekent omhoog of omlaag, dus
-      <code>-3-</code> is een kleine terts omlaag. Zonder teken telt elke richting.`,
-    syntaxCommands: `<b>Opdrachten:</b> een leeg antwoord of <code>r</code> speelt beide noten opnieuw,
-      <code>p</code> de tweede noot, <code>s</code> toont het antwoord en <code>n</code> gaat door naar de
-      volgende noot.`,
     soFar: "Tot nu toe",
     settings: "Instellingen",
     optStart: "Beginnoot",
@@ -455,16 +385,13 @@ const STRINGS = {
     ordinals: [null, "prime", "secunde", "terts", "kwart", "kwint", "sext", "septiem", "octaaf", "none",
                "decime", "undecime", "duodecime", "tredecime", "quartdecime", "dubbel octaaf"],
     perfect: "reine", augmented: "overmatige", major: "grote", minor: "kleine", tritone: "tritonus",
-    up: "omhoog", down: "omlaag", Up: "Omhoog", Down: "Omlaag",
-    from: (direction, note) => `${direction} vanaf ${note}`,
+    up: "omhoog", down: "omlaag",
     round: n => `Noot ${n}`,
     startRandom: "de beginnoot, elke ronde een nieuwe",
     startMiddleC: "de centrale C, de beginnoot",
     startNote: "de beginnoot",
     startAria: ", de beginnoot",
-    wrongDirection: "goede grootte, verkeerde richting",
     wrongOctave: "goede noot, verkeerd octaaf",
-    notAnswer: "geen noot of interval",
     noNotes: "Geen noten om uit te kiezen.",
     widen: chromatic => "Vergroot het bereik" + (chromatic ? "" : " of kies alle twaalf noten") + " in de instellingen.",
     notThat: "Die is het niet.",
@@ -491,8 +418,7 @@ const STRINGS = {
     scoreShown: "shown",
     lede: "Listen to a start note and then another note. Which note was the second one?",
     welcome: `Each round plays the start note, then a second note near it. Answer by pressing the second note on
-      the keyboard, by choosing the interval between the two, or by typing its name. Get it right and the next
-      round starts.`,
+      the keyboard. Get it right and the next round starts.`,
     welcomeSettings: `The settings below choose the start note, how far away the second note can be, and the
       sound.`,
     start: "Start",
@@ -501,26 +427,9 @@ const STRINGS = {
     playSecond: "Second note <kbd>P</kbd>",
     giveUp: "Show answer <kbd>S</kbd>",
     next: "Next note <kbd>N</kbd>",
-    tabKeys: "Keyboard",
-    tabIntervals: "Interval",
-    tabType: "Type it",
     legend: `<span class="dot"></span> the start note. Pressing a key plays it and answers with that exact
       note. Unless all twelve notes are on, only the keys of the start note's scale answer; the others just
       play.`,
-    answerLabel: "Note or interval",
-    check: "Check",
-    syntaxNote: `<b>A note:</b> <code>c d e f g a b</code> with <code>#</code> or <code>b</code>, Dutch
-      <code>fis</code>, <code>bes</code>, <code>es</code>, <code>as</code>, or fixed do: <code>do re mi fa sol la
-      si</code>. Any octave counts. To be exact, add one: <code>d4</code>, <code>eb5</code> (middle C is
-      <code>c4</code>), or LilyPond style <code>d'</code>, <code>bes,</code>.`,
-    syntaxInterval: `<b>An interval</b> from the start note: <code>2</code> is a major second, <code>2-</code> a
-      minor second, <code>4+</code> or <code>5-</code> the tritone, <code>8</code> an octave. For 1, 4, 5 and 8,
-      <code>+</code> and <code>-</code> mean augmented and diminished; for the others, <code>-</code> is minor,
-      <code>--</code> diminished and <code>+</code> augmented.`,
-    syntaxDirection: `<b>A direction:</b> put <code>+</code> or <code>-</code> in front for up or down, so
-      <code>-3-</code> is a minor third down. Without one, either direction counts.`,
-    syntaxCommands: `<b>Commands:</b> an empty answer or <code>r</code> plays both notes again, <code>p</code> the
-      second note, <code>s</code> shows the answer and <code>n</code> goes on to the next note.`,
     soFar: "So far",
     settings: "Settings",
     optStart: "Start note",
@@ -540,16 +449,13 @@ const STRINGS = {
     ordinals: [null, "unison", "second", "third", "fourth", "fifth", "sixth", "seventh", "octave", "ninth",
                "tenth", "eleventh", "twelfth", "thirteenth", "fourteenth", "double octave"],
     perfect: "perfect", augmented: "augmented", major: "major", minor: "minor", tritone: "tritone",
-    up: "up", down: "down", Up: "Up", Down: "Down",
-    from: (direction, note) => `${direction} from ${note}`,
+    up: "up", down: "down",
     round: n => `Note ${n}`,
     startRandom: "the start note, new every round",
     startMiddleC: "middle C, the start note",
     startNote: "the start note",
     startAria: ", the start note",
-    wrongDirection: "right size, wrong direction",
     wrongOctave: "right note, wrong octave",
-    notAnswer: "not a note or an interval",
     noNotes: "No notes to choose from.",
     widen: chromatic => "Widen the range" + (chromatic ? "" : " or choose all twelve notes") + " in the settings.",
     notThat: "Not that one.",
@@ -593,7 +499,6 @@ const ACCIDENTALS = new Map(Object.entries({"": 0, "#": 1, "♯": 1, "##": 2, x:
 const SHORT_FLATS = new Map(Object.entries({s: -1, ses: -2}));   // Dutch/German as, es, ases, eses
 
 const NOTE_RE = /^(do|ut|re|mi|fa|sol|so|la|si|ti|[a-g])([^\d',-]*)(-?\d+|'*|,*)$/u;
-const INTERVAL_RE = /^([+-]?)(\d+)(\++|-+|)$/;
 
 const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
 
@@ -622,24 +527,6 @@ function parseNote(text) {
   return [pc, 12 * (octave + 1) + base + alter];
 }
 
-// Return [semitones, direction] with direction 1, -1 or null.
-function parseInterval(text) {
-  const m = INTERVAL_RE.exec(text);
-  if (!m) return null;
-  const [, sign, number, mods] = m;
-  const n = parseInt(number, 10);
-  if (n < 1) return null;
-  const degree = (n - 1) % 7, octaves = Math.floor((n - 1) / 7);
-  let semis = MAJOR_SCALE[degree] + 12 * octaves;
-  if (mods.startsWith("+")) {
-    semis += mods.length;
-  } else if (mods) {
-    semis -= mods.length;
-  }
-  if (semis < 0) return null;
-  return [semis, {"+": 1, "-": -1, "": null}[sign]];
-}
-
 // --- naming ------------------------------------------------------------------
 
 const SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -653,8 +540,8 @@ function noteName(midi) {
   return names.map(n => `${n}${octave - 1}`).join(" / ");
 }
 
-// The parts of an interval's name: its answer ("6-"), its short name
-// ("6-", or "4+ = 5-" for the tritone) and its name in words.
+// The parts of an interval's name: its short name ("6-", or "4+ = 5-" for the
+// tritone) and its name in words.
 function intervalParts(semis) {
   const octaves = Math.floor(Math.abs(semis) / 12), rest = Math.abs(semis) % 12;
   let [n, mod] = SIMPLE[rest];
@@ -672,7 +559,7 @@ function intervalParts(semis) {
     short += ` = ${n + 1}-`;
     words += `, ${t("tritone")}`;
   }
-  return {answer: `${n}${mod}`, short, words};
+  return {short, words};
 }
 
 function intervalName(semis) {
@@ -818,27 +705,6 @@ function parseStart(text) {
 }
 
 // Return [correct, remark], the remark being a key of STRINGS.
-function check(answer, target, start) {
-  const dist = target - start;
-  const iv = parseInterval(answer);
-  if (iv !== null) {
-    const [semis, direction] = iv;
-    if (semis !== Math.abs(dist)) return [false, null];
-    if (direction !== null && direction !== (dist > 0 ? 1 : -1)) {
-      return [false, "wrongDirection"];
-    }
-    return [true, null];
-  }
-  const note = parseNote(answer);
-  if (note !== null) {
-    const [pc, midi] = note;
-    if (pc !== target % 12) return [false, null];
-    if (midi !== null && midi !== target) return [false, "wrongOctave"];
-    return [true, null];
-  }
-  return [false, "notAnswer"];
-}
-
 // mulberry32: a small seeded generator, for the seed option.
 function seeded(seed) {
   let a = seed >>> 0;
@@ -921,19 +787,18 @@ class Game {
   playBoth() { this.sound.play(this.both); }
   playSecond() { this.sound.play([[this.target, 0.0, 1.4]]); }
 
-  // Check an answer; return true if it was right. el is the key or button it came from.
-  answer(text, el) {
+  // Check a key on the keyboard as the answer; return true if it was right.
+  answer(pitch, key) {
     if (this.phase !== "asking") return false;
     this.tries++;
-    const [ok, remark] = check(normalize(text), this.target, this.start);
-    if (!ok) {
-      el?.classList.add("wrong");
-      showFeedback("no", () => t("notThat"), () => remark ? capitalize(t(remark)) + "." : t("tryAgain"));
+    if (pitch !== this.target) {
+      const octaveOff = pitch % 12 === this.target % 12;
+      key.classList.add("wrong");
+      showFeedback("no", () => t("notThat"), () => octaveOff ? capitalize(t("wrongOctave")) + "." : t("tryAgain"));
       return false;
     }
     this.phase = "right";
     if (this.tries === 1) this.firstTime++; else this.later++;
-    el?.classList.add("right");
     markAnswer(this);
     const {start, target} = this;
     showFeedback("yes", () => t("right"), () => `${noteName(target)} · ${intervalName(target - start)}`);
@@ -1014,7 +879,6 @@ function renderRound(g) {
   drawFeedback();
   setButtons(g);
   renderKeyboard(g);
-  renderIntervals(g);
 }
 
 function labelRound(g) {
@@ -1055,49 +919,9 @@ function renderKeyboard(g) {
   scroller.scrollLeft = start.offsetLeft + start.offsetWidth / 2 - scroller.clientWidth / 2;
 }
 
-// A button for every interval in range, down and up.
-function renderIntervals(g) {
-  const box = $("intervals");
-  box.replaceChildren();
-  for (const sign of g.opts.up ? [1] : [-1, 1]) {
-    const group = document.createElement("div");
-    group.className = "group";
-    group.dataset.sign = sign;
-    const h = document.createElement("h3");
-    const grid = document.createElement("div");
-    grid.className = "interval-grid";
-    for (let semis = 1; semis <= g.opts.range; semis++) {
-      const {answer, short} = intervalParts(semis);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.answer = (sign > 0 ? "+" : "-") + answer;
-      button.dataset.semis = sign * semis;
-      const b = document.createElement("b");
-      b.textContent = short;
-      button.append(b, document.createElement("span"));
-      grid.append(button);
-    }
-    group.append(h, grid);
-    box.append(group);
-  }
-  labelIntervals(g);
-}
-
-// The words on the interval buttons, which change with the language.
-function labelIntervals(g) {
-  for (const group of $("intervals").children) {
-    const direction = t(group.dataset.sign > 0 ? "Up" : "Down");
-    group.querySelector("h3").textContent = t("from", direction, noteName(g.start));
-    for (const button of group.querySelectorAll("button")) {
-      button.querySelector("span").textContent = intervalParts(Number(button.dataset.semis)).words;
-    }
-  }
-}
-
-// Show the answer on the keyboard and among the intervals.
+// Show the answer on the keyboard.
 function markAnswer(g) {
   $("keyboard").querySelector(`[data-pitch="${g.target}"]`)?.classList.add("right");
-  $("intervals").querySelector(`[data-semis="${g.target - g.start}"]`)?.classList.add("right");
 }
 
 // result is "first", "later" (more tries) or "shown".
@@ -1132,14 +956,12 @@ function setLanguage(name) {
   document.documentElement.lang = name;
   for (const el of document.querySelectorAll("[data-t]")) el.innerHTML = t(el.dataset.t);
   for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
-  $("answer").setAttribute("aria-label", t("answerLabel"));
   $("install-hide").setAttribute("aria-label", t("installHide"));
   $("start-button").textContent = t(game ? "startOver" : "start");
   $("notice").textContent = t("notice");
   $("options-error").textContent = optionsError ? t(optionsError) : "";
   if (!game) return;
   labelRound(game);
-  labelIntervals(game);
   $("keyboard").querySelector(".start")?.setAttribute("aria-label", noteName(game.start) + t("startAria"));
   drawFeedback();
   drawHistory(game);
@@ -1149,7 +971,7 @@ for (const b of document.querySelectorAll("[data-lang]")) {
   b.addEventListener("click", () => setLanguage(b.dataset.lang));
 }
 
-// --- tabs, keys and buttons --------------------------------------------------
+// --- keys and buttons -------------------------------------------------------
 
 // The score's tooltips say what each counter counts. They show on hover with a
 // mouse, on focus from the keyboard, and on a tap; another tap, a tap
@@ -1173,57 +995,20 @@ for (const chip of document.querySelectorAll(".chip")) {
 document.addEventListener("click", () => { if (openTip) showTip(null); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && openTip) showTip(null); });
 
-function selectTab(name) {
-  for (const tab of document.querySelectorAll("[role=tab]")) {
-    tab.setAttribute("aria-selected", tab.dataset.tab === name);
-  }
-  for (const panel of document.querySelectorAll("[role=tabpanel]")) {
-    panel.hidden = panel.dataset.panel !== name;
-  }
-  try { localStorage.setItem("solfege.tab", name); } catch {}
-  if (name === "type" && game) $("answer").focus();
-}
-
-for (const tab of document.querySelectorAll("[role=tab]")) {
-  tab.addEventListener("click", () => selectTab(tab.dataset.tab));
-}
-try {
-  const saved = localStorage.getItem("solfege.tab");
-  if (saved && document.querySelector(`[data-tab="${saved}"]`)) selectTab(saved);
-} catch {}
+// The page used to remember a tab, from when there were other ways to answer.
+try { localStorage.removeItem("solfege.tab"); } catch {}
 
 $("keyboard").addEventListener("click", e => {
   const key = e.target.closest(".key");
   if (!key || !game) return;
   const pitch = Number(key.dataset.pitch);
-  // An exact answer, such as "c#4". After the round a key only plays, and so
-  // does one that can't be the answer, outside the start note's scale.
+  // After the round a key only plays, and so does one that can't be the answer,
+  // outside the start note's scale.
   if (game.phase === "asking" && inScale(game.opts, game.start, pitch)) {
-    const right = game.answer(SHARPS[pitch % 12].toLowerCase() + (Math.floor(pitch / 12) - 1), key);
+    const right = game.answer(pitch, key);
     if (right) return;
   }
   sound.play([[pitch, 0.0, 0.9]]);
-});
-
-$("intervals").addEventListener("click", e => {
-  const button = e.target.closest("button[data-answer]");
-  if (button && game) game.answer(button.dataset.answer, button);
-});
-
-$("type-form").addEventListener("submit", e => {
-  e.preventDefault();
-  const text = $("answer").value;
-  if (!game) return;
-  // The terminal's commands work here too.
-  const command = {"": "playBoth", r: "playBoth", p: "playSecond", s: "giveUp", n: "next"}[normalize(text)];
-  if (command) {
-    game[command]();
-    $("answer").value = "";
-  } else if (game.answer(text)) {
-    $("answer").value = "";
-  } else {
-    $("answer").select();
-  }
 });
 
 $("play-both").addEventListener("click", () => game?.playBoth());
