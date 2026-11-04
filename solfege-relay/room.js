@@ -84,7 +84,7 @@ export async function connect({
         room.present = present;
         room.onPresence(present);
       }
-      const now = listening && (iCreated || otherHere);
+      const now = listening;     // only about this browser's own connection: the other may be away
       if (connected !== now) {
         connected = now;
         room.onConnection(now);
