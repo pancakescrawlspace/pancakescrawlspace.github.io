@@ -328,7 +328,7 @@
       <button type="button" role="menuitem" data-act="games"><span data-t="games"></span></button>
       <button type="button" role="menuitem" data-act="twoTabs"><span data-t="twoTabs"></span></button>
       <button type="button" role="menuitem" data-act="online" hidden><span data-t="playOnline"></span></button>
-      <button type="button" role="menuitem" data-act="invite" hidden><span data-t="showInvite"></span></button>
+      <button type="button" role="menuitem" data-act="invite" hidden><span data-t="copyGameLink"></span></button>
       <hr>
       <button type="button" role="menuitemradio" data-act="opp" data-n="1"><span data-t="opp1"></span></button>
       <button type="button" role="menuitemradio" data-act="opp" data-n="2"><span data-t="opp2"></span></button>
@@ -502,9 +502,14 @@ const STRINGS = {
     creatorNotListed: uid => `Dit Google-account staat niet op de lijst van wie spellen mag aanmaken. Vraag de beheerder het toe te voegen. Je nummer is: ${uid}`,
     secretTitle: "Spellen aanmaken", secretNote: "Op deze server mag je alleen een spel aanmaken als je het wachtwoord kent. Dat hoef je maar één keer in te vullen.", secretLabel: "Wachtwoord",
     secretWrong: "Dat wachtwoord klopt niet.", secretTooMany: "Te vaak geprobeerd. Wacht een minuut.", tooManyRooms: "De server heeft al te veel spellen.",
-    playOnline: "Online spelen...", showInvite: "Uitnodigingen...", yourName: "Je naam", onlineNote: "Je maakt een spel aan en krijgt een link voor elke andere speler.",
+    playOnline: "Online spelen...", showInvite: "Spellinks...", yourName: "Je naam", onlineNote: "Je maakt een spel aan en krijgt een link voor elke andere speler.",
     seatPerson: "een persoon", seatComputer: "een computerspeler", seatNone: "niemand", onlineCreate: "Aanmaken", onlineJoin: "Meedoen",
     onlineNeedsPerson: "Een online spel heeft minstens één andere persoon nodig.", onlineFailed: "Dat lukte niet: de multiplayer-server reageert niet goed.",
+    copyGameLink: "Spellink kopiëren", linkToCopy: "Spellink",
+    linkCopied: "De link is gekopieerd. Stuur hem naar je tegenstander. Wie hem als eerste opent, krijgt de plaats.",
+    linkCopiedJoined: "De link is gekopieerd. Wie al meedoet, komt er weer mee in dit spel, in dezelfde browser. Op een ander apparaat werkt dat niet.",
+    linkNotCopied: "Kopieer deze link. Wie al meedoet, komt er weer mee in dit spel, in dezelfde browser. Wie nog niet meedoet en hem als eerste opent, krijgt de plaats.",
+    inviteJoinedNote: "Wie al meedoet, komt met zijn link weer in dit spel, in dezelfde browser.",
     inviteNote: "Stuur elke speler zijn eigen link. Wie hem als eerste opent, krijgt de plaats.", copyLink: "Kopiëren", shareLink: "Delen",
     joinNote: (host, n) => `${host} nodigt je uit voor een spel met ${n} spelers.`, waitingToJoin: "Wachten tot iedereen meedoet...",
     offline: "De verbinding is weg; er wordt opnieuw geprobeerd...", seatInvited: "uitgenodigd", seatAway: "afwezig",
@@ -581,9 +586,14 @@ const STRINGS = {
     creatorNotListed: uid => `This Google account isn't on the list of those who may create games. Ask whoever runs this to add it. Your number is: ${uid}`,
     secretTitle: "Creating games", secretNote: "On this server you can only create a game if you know the password. You only have to enter it once.", secretLabel: "Password",
     secretWrong: "That password isn't right.", secretTooMany: "Too many tries. Please wait a minute.", tooManyRooms: "The server has too many games already.",
-    playOnline: "Play online...", showInvite: "Invitations...", yourName: "Your name", onlineNote: "You create a game, and get a link for every other player.",
+    playOnline: "Play online...", showInvite: "Game links...", yourName: "Your name", onlineNote: "You create a game, and get a link for every other player.",
     seatPerson: "a person", seatComputer: "a computer player", seatNone: "nobody", onlineCreate: "Create", onlineJoin: "Join",
     onlineNeedsPerson: "An online game needs at least one other person.", onlineFailed: "That didn't work: the multiplayer server isn't answering properly.",
+    copyGameLink: "Copy game link", linkToCopy: "Game link",
+    linkCopied: "The link is copied. Send it to your opponent. Whoever opens it first gets the seat.",
+    linkCopiedJoined: "The link is copied. Anyone already in the game gets back in with it, in the same browser. It doesn't work on another device.",
+    linkNotCopied: "Copy this link. Anyone already in the game gets back in with it, in the same browser. If a seat is still open, whoever opens it first gets that seat.",
+    inviteJoinedNote: "Anyone already in the game gets back in with their link, in the same browser.",
     inviteNote: "Send each player their own link. Whoever opens it first gets the seat.", copyLink: "Copy", shareLink: "Share",
     joinNote: (host, n) => `${host} invites you to a game for ${n} players.`, waitingToJoin: "Waiting for everyone to join...",
     offline: "The connection is gone; trying again...", seatInvited: "invited", seatAway: "away",
@@ -1893,7 +1903,7 @@ for (const item of document.querySelectorAll(".menu [data-act]")) {
     else if (act === "games") showGames();
     else if (act === "twoTabs") askTwoTabs();
     else if (act === "online") askOnline();
-    else if (act === "invite") showInvites();
+    else if (act === "invite") copyGameLink();
     else if (act === "opp") { const n = Number(item.dataset.n); if (n !== game?.players.length - 1) setOpponents(n); }
     else if (act === "scores") showScores(null);
     else if (act === "options") showOptions();
@@ -1951,7 +1961,12 @@ async function lookForServer() {
 function showMenuItems() {
   const online = Boolean(room?.online);
   $('[data-act="online"]').hidden = !serverThere;
-  $('[data-act="invite"]').hidden = !online || !invitesOfThisRoom();
+  const invite = $('[data-act="invite"]');
+  invite.hidden = !online;
+  // With several links there's a choice to make, so it asks which.
+  const span = invite.querySelector("span");
+  span.dataset.t = Object.keys(invitesOfThisRoom() ?? {}).length > 1 ? "showInvite" : "copyGameLink";
+  span.textContent = t(span.dataset.t);
   $('[data-act="stop"]').hidden = online;      // it would only stop it for you
 }
 
@@ -2063,23 +2078,43 @@ async function askSecret(retry) {
 
 function invitesOfThisRoom() {
   if (!room?.online) return null;
-  if (record?.seats.every(seat => seat.kind !== "person" || seat.uid)) return null;     // everyone is in
   if (Object.keys(room.inviteLinks ?? {}).length) return room.inviteLinks;
   try { return JSON.parse(localStorage.getItem(INVITES_PREFIX + gameId)); } catch { return null; }
+}
+// The link to send again: the invitation if this browser made it, or else the room's address.
+async function copyGameLink() {
+  const entries = Object.entries(invitesOfThisRoom() ?? {});
+  if (entries.length > 1) { showInvites(); return; }
+  const [seat, invitation] = entries[0] ?? [];
+  const address = new URL(location.href);
+  address.hash = "";
+  const link = invitation ?? address.href;
+  try {
+    await navigator.clipboard.writeText(link);
+    message(t(invitation && !record?.seats[seat]?.uid ? "linkCopied" : "linkCopiedJoined"));
+  } catch {
+    // No clipboard here, such as on a plain address on the home network.
+    const box = document.createElement("div");
+    box.innerHTML = `<p>${t("linkNotCopied")}</p><input class="link" readonly>`;
+    const input = box.querySelector("input");
+    input.value = link;
+    dialog(t("linkToCopy"), box, [{label: t("close"), default: true, cancel: true}]);
+    input.select();
+  }
 }
 function showInvites() {
   const links = invitesOfThisRoom();
   if (!links) return;
   const box = document.createElement("div");
   const note = document.createElement("p");
-  note.textContent = t("inviteNote");
+  const joined = seat => record?.seats[seat]?.uid;
+  note.textContent = Object.keys(links).some(joined) ? `${t("inviteNote")} ${t("inviteJoinedNote")}` : t("inviteNote");
   box.append(note);
   for (const [seat, link] of Object.entries(links)) {
-    if (record?.seats[seat]?.uid) continue;      // the first record may still be on its way
     const label = document.createElement("label");
     label.className = "invite-row";
     const title = document.createElement("span");
-    title.textContent = t("playerN", Number(seat) + 1);
+    title.textContent = joined(seat) && record.seats[seat].name ? record.seats[seat].name : t("playerN", Number(seat) + 1);
     const input = document.createElement("input");
     input.className = "link";
     input.readOnly = true;
