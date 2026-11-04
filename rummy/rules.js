@@ -9,7 +9,10 @@
 // - solveExact(): the dynamic program behind "optimal" opponents, in JavaScript;
 // - wasmSolver(): the same dynamic program compiled from solver.c to
 //   WebAssembly, which is faster;
-// - realize(), simpleMove() and computerMove(): turning a solution into a move.
+// - realize(), simpleMove() and computerMove(): turning a solution into a move;
+// - dealGame(), checkPlay(), playTiles(), drawTiles() and advanceTurn(): the rules
+//   of a turn, on the game's shared state;
+// - checkTurn(): the referee, which checks a state that came from elsewhere.
 "use strict";
 
 
@@ -553,4 +556,203 @@ function computerMove(table, rack, melded, level) {
   }
   const placed = rack.filter(id => !move.rack.includes(id));
   return placed.length ? {...move, placed} : null;
+}
+
+// --- the rules of a turn ----------------------------------------------------------
+//
+// These work on the game's shared state, a plain JSON value:
+//
+//   {players: [{human, name, rack, melded, said}], pool, table, current, turns,
+//    passes, over, result: {winner, blocked}, sheet: [{points, winner}], round, top}
+//
+// None of them changes the state it is given: each returns a new one, so anyone
+// can hold on to the state before a move and compare. They know nothing of a page,
+// or of where a move comes from. They throw on a move that isn't allowed; checkPlay
+// says why beforehand.
+
+const copyGame = game => JSON.parse(JSON.stringify(game));
+const sortedIds = ids => [...ids].sort((a, b) => a - b);
+
+function shuffle(list, random) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+// The points of the sets made only of these tiles: what counts for a first meld.
+function meldPoints(table, placed) {
+  const mine = new Set(placed);
+  return table.filter(set => set.every(id => mine.has(id))).reduce((s, set) => s + (analyse(set)?.points ?? 0), 0);
+}
+
+// A new game for these players ({human, name}): 14 tiles each and the rest in the
+// pool. Everyone draws a tile, and the highest starts; a tie draws again. `round`
+// counts the games played on, and `top` is the number that won the draw.
+function dealGame(players, random = Math.random, sheet = [], round = 1) {
+  const pool = shuffle(TILES.map(tile => tile.id), random);
+  const dealt = players.map(p => ({...p, rack: pool.splice(0, 14), melded: false, said: null}));
+  let picks, top;
+  do {
+    const bag = shuffle(TILES.filter(tile => !tile.joker).map(tile => tile.v), random);
+    picks = dealt.map((_, i) => bag[i]);
+    top = Math.max(...picks);
+  } while (picks.filter(v => v === top).length > 1);
+  dealt.forEach((p, i) => { p.said = ["picked", picks[i]]; });
+  const game = {players: dealt, pool, table: [], current: picks.indexOf(top), turns: 0, passes: 0, over: false, result: null,
+                sheet: copyGame(sheet), round, top};
+  return {game, top};
+}
+
+// The seat that writes the next turn in a shared record: the player to move, or
+// after a game its winner, who so starts the next one.
+const whoWrites = game => game.over ? game.result.winner : game.current;
+
+function mustBeTurnOf(game, seat) {
+  if (game.over) throw new RangeError("the game is over");
+  if (seat !== game.current) throw new RangeError(`it is not seat ${seat}'s turn`);
+}
+
+// The end of the game, for a winner, or null if everyone had to pass: then the
+// lowest rack wins. It changes the copy it is given.
+function finishGame(next, winner) {
+  const values = next.players.map(p => rackValue(p.rack));
+  const blocked = winner === null;
+  let points;
+  if (blocked) {
+    const low = Math.min(...values);
+    winner = values.indexOf(low);
+    points = values.map(v => low - v);
+  } else {
+    points = values.map(v => -v);
+  }
+  points[winner] = -points.reduce((s, x, i) => i === winner ? s : s + x, 0);
+  next.sheet.push({points, winner});
+  next.players[winner].said = ["saidOut"];
+  next.over = true;
+  next.result = {winner, blocked};
+  return next;
+}
+
+// Whether this seat may end its turn with this table and rack. Returns null if
+// so, or else why not, as [key, ...args] for the page's messages.
+function checkPlay(game, seat, table, rack) {
+  mustBeTurnOf(game, seat);
+  const player = game.players[seat];
+  const had = new Set(player.rack);
+  if (rack.some(id => !had.has(id)) ||
+      String(sortedIds([...table.flat(), ...rack])) !== String(sortedIds([...game.table.flat(), ...player.rack]))) {
+    return ["errTiles"];                         // a tile from elsewhere, or a table tile taken back
+  }
+  const left = new Set(rack), placed = player.rack.filter(id => !left.has(id));
+  if (!placed.length) return ["errNothing"];
+  if (table.some(set => !analyse(set))) return ["errInvalid"];
+  if (!player.melded) {
+    const sets = new Set(table.map(String));
+    if (game.table.some(set => !sets.has(String(set)))) return ["errLocked"];
+    const points = meldPoints(table, placed);
+    if (points < 30) return ["errMeld", points];
+  }
+  return null;
+}
+
+// A seat ends its turn with this table and rack; if the rack is empty, it has won.
+// Returns the new game, and the tiles that went from the rack to the table.
+function playTiles(game, seat, table, rack) {
+  const error = checkPlay(game, seat, table, rack);
+  if (error) throw new RangeError(`this play isn't allowed: ${error}`);
+  const next = copyGame(game), player = next.players[seat];
+  const left = new Set(rack), placed = player.rack.filter(id => !left.has(id));
+  player.said = player.melded ? ["saidPlay", placed.length] : ["saidMeld", meldPoints(table, placed)];
+  player.melded = true;
+  player.rack = [...rack];
+  next.table = table.map(set => [...set]);
+  next.passes = 0;
+  return {game: rack.length ? next : finishGame(next, seat), placed};
+}
+
+// A seat draws tiles from the pool (three as the time limit's penalty), or passes
+// if it is empty; the game ends once everyone in a row has had to pass. Returns
+// the new game, and the tiles drawn. What everyone can read doesn't say which.
+function drawTiles(game, seat, count = 1) {
+  mustBeTurnOf(game, seat);
+  const next = copyGame(game), player = next.players[seat];
+  if (!next.pool.length) {
+    player.said = ["saidPass"];
+    next.passes++;
+    return {game: next.passes >= next.players.length ? finishGame(next, null) : next, drawn: []};
+  }
+  const drawn = [];
+  for (let i = 0; i < count && next.pool.length; i++) drawn.push(next.pool.pop());
+  player.rack.push(...drawn);
+  player.said = count === 3 ? ["saidPenalty"] : ["saidDraw"];
+  return {game: next, drawn};
+}
+
+// The next player's turn.
+function advanceTurn(game) {
+  if (game.over) throw new RangeError("the game is over");
+  const next = copyGame(game);
+  next.current = (next.current + 1) % next.players.length;
+  next.turns++;
+  return next;
+}
+
+// --- the referee -------------------------------------------------------------------
+//
+// Whether `after` can follow `before` in one turn by this seat: a play, a draw or a
+// pass, followed by the next player's turn; or, after the end of a game, the deal of
+// the next one. Returns null if so, or else a word for what is wrong. It simply works
+// out what the rules give and compares, so it needs nothing but the two states.
+//
+// It catches anything that breaks the rules, and also a draw that isn't the top of
+// the pool. It can't tell whether a deal was really shuffled, or whether someone has
+// looked at the other racks; that takes more than a referee.
+function checkTurn(before, after, seat) {
+  try {
+    return before.over ? checkNextDeal(before, after, seat) : checkPlayOrDraw(before, after, seat);
+  } catch {
+    return "not-a-game";
+  }
+}
+
+function checkPlayOrDraw(before, after, seat) {
+  if (seat !== before.current) return "wrong-seat";
+  const had = before.players[seat], has = after.players[seat];
+  const sameTable = sameState(before.table, after.table);
+  let expected;
+  if (sameTable && has.rack.length >= had.rack.length) {
+    expected = drawTiles(before, seat, has.said?.[0] === "saidPenalty" ? 3 : 1).game;
+  } else {
+    const error = checkPlay(before, seat, after.table, has.rack);
+    if (error) return error[0];
+    expected = playTiles(before, seat, after.table, has.rack).game;
+  }
+  if (!expected.over) expected = advanceTurn(expected);
+  return sameState(expected, after) ? null : "not-what-the-rules-give";
+}
+
+function checkNextDeal(before, after, seat) {
+  if (seat !== whoWrites(before)) return "wrong-seat";
+  if (after.over || after.result !== null || after.turns !== 0 || after.passes !== 0 || after.table.length) return "not-a-new-deal";
+  if (after.round !== before.round + 1) return "wrong-round";
+  if (!sameState(after.sheet, before.sheet)) return "scores-changed";
+  const who = players => players.map(({human, name}) => ({human, name}));
+  if (!sameState(who(after.players), who(before.players))) return "players-changed";
+  if (after.players.some(p => p.rack.length !== 14 || p.melded)) return "not-a-new-deal";
+  const all = sortedIds([...after.players.flatMap(p => p.rack), ...after.pool]);
+  if (String(all) !== String(TILES.map(tile => tile.id))) return "tiles-missing";
+  const picks = after.players.map(p => p.said?.[1]);
+  const top = Math.max(...picks);
+  if (after.top !== top || picks.filter(v => v === top).length !== 1 || picks[after.current] !== top) return "wrong-starter";
+  return null;
+}
+
+// Compares two JSON values, whatever the order of their keys, since storage and
+// services don't all keep that.
+function sameState(a, b) {
+  const sorted = value => Array.isArray(value) ? value.map(sorted)
+    : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map(key => [key, sorted(value[key])])) : value;
+  return JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
 }

@@ -131,7 +131,7 @@
   .statusbar > div { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #status { flex: 1; }
   #status.warn { color: var(--no); }
-  .app { width: min(1200px, 100vw); height: min(880px, 100dvh); }
+  .app { width: 100vw; height: 100dvh; }
 
   /* --- the table: opponents left, top and right, you at the bottom --- */
   .tabletop {
@@ -200,6 +200,8 @@
   .set.over, .newset.over, #rack.over { outline: 2px dashed var(--on-table); outline-offset: 2px; }
   .empty-table { align-self: center; margin: auto; color: var(--on-table-soft); text-align: center; }
 
+  #observing { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  #observing .btn { color: var(--text); }
   .mine { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; }
   .mine .who { flex-direction: row; gap: 8px; max-width: none; }
   #rack {
@@ -290,6 +292,16 @@
   legend { padding: 0 4px; color: var(--muted); }
   fieldset label { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
   fieldset .note { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .game-row { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .game-row:first-child { border-top: none; }
+  .game-about { flex: 1; min-width: 0; }
+  .game-when { color: var(--muted); font-size: 12px; }
+  .games-full { color: var(--no); }
+  .btn.small { min-width: 0; padding: 3px 8px; }
+  .field { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .field span { min-width: 7em; }
+  .field input, .field select, input.link { flex: 1; min-width: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+  .invite-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
   .sheet { width: 100%; border-collapse: collapse; }
   .sheet th, .sheet td { padding: 3px 8px; text-align: right; white-space: nowrap; }
   .sheet th:first-child, .sheet td:first-child { text-align: left; }
@@ -312,6 +324,11 @@
     </span>
     <div class="menu" id="menu" role="menu" aria-label="Menu" hidden>
       <button type="button" role="menuitem" data-act="new"><span data-t="newGame"></span><span>F2</span></button>
+      <button type="button" role="menuitem" data-act="stop"><span data-t="stopGame"></span></button>
+      <button type="button" role="menuitem" data-act="games"><span data-t="games"></span></button>
+      <button type="button" role="menuitem" data-act="twoTabs"><span data-t="twoTabs"></span></button>
+      <button type="button" role="menuitem" data-act="online" hidden><span data-t="playOnline"></span></button>
+      <button type="button" role="menuitem" data-act="invite" hidden><span data-t="showInvite"></span></button>
       <hr>
       <button type="button" role="menuitemradio" data-act="opp" data-n="1"><span data-t="opp1"></span></button>
       <button type="button" role="menuitemradio" data-act="opp" data-n="2"><span data-t="opp2"></span></button>
@@ -329,7 +346,8 @@
     <div class="seat" id="seat-top" hidden><div class="hand h"></div><div class="who"><span class="name"></span><span class="count"></span></div><div class="said"></div></div>
     <div class="seat" id="seat-right" hidden><div class="who"><span class="name"></span><span class="count"></span></div><div class="hand v"></div><div class="said"></div></div>
     <div id="table"></div>
-    <div class="seat" id="seat-bottom">
+    <div class="seat" id="seat-bottom" hidden>
+      <div id="observing" hidden><span data-t="observingNote"></span><button type="button" class="btn small" id="play-here" data-t="playHere"></button></div>
       <div class="mine">
         <div class="who"><span class="name"></span><span class="said"></span></div>
         <div id="rack"></div>
@@ -351,15 +369,23 @@
 <div class="layer" id="layer" hidden></div>
 
 <script src="rules.js"></script>
+<script src="room.js"></script>
 <script>
 "use strict";
 
-// The rules and the computer players are in rules.js.
+// The rules and the computer players are in rules.js, and the record of the game
+// in room.js. This page draws the record it receives, and writes a new one when a
+// turn ends; it never changes the shared state any other way.
 
 const $ = sel => document.querySelector(sel);
 const params = new URLSearchParams(location.search);
 // ?test is for test/index.html: no waiting between turns, and nothing kept
-// between visits. ?seed=1 deals the same tiles every time.
+// between visits, unless with &keep, or set up with &delay=200 a room as slow as a
+// network, &people=2 that many seats for people instead of computer players, and
+// &nolocks a browser without Web Locks.
+// ?seed=1 deals the same tiles every time. ?game=<id> is the game to open, and
+// &seat=1 who you are in it, for a game of two tabs. ?room=<id> is a game played
+// online, with &session=a a session of its own in the tests.
 const TEST = params.has("test");
 let random = Math.random;
 if (params.has("seed")) {
@@ -463,7 +489,40 @@ const STRINGS = {
     optOpp: "Tegenstanders", optLevel: "De tegenstanders", easy: "Makkelijk: leggen alleen aan",
     strong: "Sterk: schuiven ook op tafel", optimal: "Optimaal: altijd de beste zet van de beurt", optTimer: "Eén minuut per beurt", optLang: "Taal",
     restartNote: "Een ander aantal tegenstanders begint een nieuw spel.",
-    newGameAsk: "Een nieuw spel beginnen? De scores gaan dan verloren.", yes: "Ja", no: "Nee",
+    yes: "Ja", no: "Nee", opponent: "Tegenstander",
+    observingNote: "Dit tabblad kijkt alleen mee.", playHere: "Hier spelen",
+    stopGame: "Spel stoppen", stopGameYes: "Stoppen en wissen",
+    gamesNearLimit: (n, most) => `Er zijn ${n} spellen bewaard, en het maximum is ${most}. Daarboven verdwijnen de oudste, afgelopen spellen eerst.`,
+    deleteFinished: n => n === 1 ? "Afgelopen spel wissen" : `${n} afgelopen spellen wissen`,
+    deleteFinishedAsk: n => n === 1 ? "Het afgelopen spel wissen? Dat kan niet ongedaan worden gemaakt." : `Alle ${n} afgelopen spellen wissen? Dat kan niet ongedaan worden gemaakt.`,
+    stopGameAsk: "Dit spel stoppen en alles wat ervan bewaard is wissen, ook de scores? Dat kan niet ongedaan worden gemaakt.",
+    gameStopped: "Het spel is gestopt en gewist.", gameStoppedElsewhere: "Dit spel is in een ander tabblad gestopt en gewist.",
+    moveSuspect: name => `${name ? `De laatste zet van ${name}` : "Je laatste zet"} klopt niet met de spelregels. Het spel gaat door, maar de stand is misschien niet meer te vertrouwen.`,
+    googleNote: "Om een spel aan te maken, moet je inloggen met een Google-account dat op de lijst staat.", googleSignIn: "Inloggen met Google",
+    creatorNotListed: uid => `Dit Google-account staat niet op de lijst van wie spellen mag aanmaken. Vraag de beheerder het toe te voegen. Je nummer is: ${uid}`,
+    secretTitle: "Spellen aanmaken", secretNote: "Op deze server mag je alleen een spel aanmaken als je het wachtwoord kent. Dat hoef je maar één keer in te vullen.", secretLabel: "Wachtwoord",
+    secretWrong: "Dat wachtwoord klopt niet.", secretTooMany: "Te vaak geprobeerd. Wacht een minuut.", tooManyRooms: "De server heeft al te veel spellen.",
+    playOnline: "Online spelen...", showInvite: "Uitnodigingen...", yourName: "Je naam", onlineNote: "Je maakt een spel aan en krijgt een link voor elke andere speler.",
+    seatPerson: "een persoon", seatComputer: "een computerspeler", seatNone: "niemand", onlineCreate: "Aanmaken", onlineJoin: "Meedoen",
+    onlineNeedsPerson: "Een online spel heeft minstens één andere persoon nodig.", onlineFailed: "Dat lukte niet: de multiplayer-server reageert niet goed.",
+    inviteNote: "Stuur elke speler zijn eigen link. Wie hem als eerste opent, krijgt de plaats.", copyLink: "Kopiëren", shareLink: "Delen",
+    joinNote: (host, n) => `${host} nodigt je uit voor een spel met ${n} spelers.`, waitingToJoin: "Wachten tot iedereen meedoet...",
+    offline: "De verbinding is weg; er wordt opnieuw geprobeerd...", seatInvited: "uitgenodigd", seatAway: "afwezig",
+    inviteIsYours: "Deze uitnodiging is voor een andere speler, en deze browser doet al mee. Om het op één computer uit te proberen: open de link in een andere browser of een privévenster.",
+    seatTaken: "Deze uitnodiging is al gebruikt.", inviteNotValid: "Deze uitnodiging klopt niet.", inviteDeclined: "Je doet niet mee aan dat spel.",
+    roomGone: "Dit spel bestaat niet meer.", notInRoom: "Je doet niet mee aan dit spel. Vraag om een uitnodiging.",
+    waitNext: name => `${name} begint het volgende spel.`, yourTurnShort: "Jouw beurt", gameOnline: "Online", gameForget: "Vergeten",
+    twoTabs: "Tegen jezelf in twee tabbladen...", playerN: n => `Speler ${n}`, twoTabsOpen: "Open speler 2",
+    twoTabsNote: "Elk tabblad is een speler, en elke zet verschijnt meteen in het andere. Dit spel staat alleen in deze browser.",
+    twoTabsOpenNote: "Open nu het tabblad voor speler 2. Je kunt ook het adres van dit tabblad kopiëren, met &seat=1 erachter.",
+    twoTabsComputers: "Computerspelers", twoTabsLevel: level => `${level}. Dat staat vast voor dit spel; het is te veranderen in de opties.`,
+    computerSuspect: name => `De zet van ${name} is niet wat de computer zou spelen. Misschien is er met het spel geknoeid, of werkt een tabblad met een andere versie.`,
+    games: "Mijn spellen...", noSavedGames: "Er zijn nog geen spellen bewaard.",
+    gameWith: n => n === 1 ? "Tegen 1 tegenstander" : `Tegen ${n} tegenstanders`, gameFinished: "afgelopen", gameOngoing: "bezig",
+    gamesPlayed: n => n === 1 ? "1 spel uitgespeeld" : `${n} spellen uitgespeeld`, gameHere: "Dit spel speel je nu.",
+    gameOpen: "Openen", gameDelete: "Verwijderen", gameDeleteAsk: "Dit spel verwijderen? Dat kan niet ongedaan worden gemaakt.",
+    gameUnknown: "Dit spel staat niet in deze browser. Misschien is het adres niet helemaal goed, of is het op een ander apparaat gespeeld.",
+    notAccepted: "Die zet kon niet worden doorgegeven. Probeer het nog eens.",
     aboutText: `<p><b>Tile Rummy</b></p><p>Een spel met genummerde stenen voor jou en één tot drie computerspelers, naar de officiële regels van het bekende stenenspel. Alles draait in je browser; er is geen server.</p>`,
     solverwasm: "De zetten van de tegenstanders worden berekend in een Web Worker, met WebAssembly.",
     solverjs: "De zetten van de tegenstanders worden berekend in een Web Worker, in JavaScript.",
@@ -509,7 +568,40 @@ const STRINGS = {
     optOpp: "Opponents", optLevel: "The opponents", easy: "Easy: only add to sets",
     strong: "Strong: also rearrange the table", optimal: "Optimal: always the best move of the turn", optTimer: "One minute per turn", optLang: "Language",
     restartNote: "Another number of opponents starts a new game.",
-    newGameAsk: "Start a new game? The scores will be lost.", yes: "Yes", no: "No",
+    yes: "Yes", no: "No", opponent: "Opponent",
+    observingNote: "This tab is only watching.", playHere: "Play here",
+    stopGame: "Stop game", stopGameYes: "Stop and delete",
+    gamesNearLimit: (n, most) => `${n} games are kept, and the limit is ${most}. Above it the oldest go, finished ones first.`,
+    deleteFinished: n => n === 1 ? "Delete the finished game" : `Delete ${n} finished games`,
+    deleteFinishedAsk: n => n === 1 ? "Delete the finished game? This can't be undone." : `Delete all ${n} finished games? This can't be undone.`,
+    stopGameAsk: "Stop this game and delete everything kept of it, the scores too? This can't be undone.",
+    gameStopped: "The game has been stopped and deleted.", gameStoppedElsewhere: "This game was stopped and deleted in another tab.",
+    moveSuspect: name => `${name ? `${name}'s last move doesn't` : "Your last move doesn't"} fit the rules. The game goes on, but the score may not be reliable any more.`,
+    googleNote: "To create a game, sign in with a Google account that is on the list.", googleSignIn: "Sign in with Google",
+    creatorNotListed: uid => `This Google account isn't on the list of those who may create games. Ask whoever runs this to add it. Your number is: ${uid}`,
+    secretTitle: "Creating games", secretNote: "On this server you can only create a game if you know the password. You only have to enter it once.", secretLabel: "Password",
+    secretWrong: "That password isn't right.", secretTooMany: "Too many tries. Please wait a minute.", tooManyRooms: "The server has too many games already.",
+    playOnline: "Play online...", showInvite: "Invitations...", yourName: "Your name", onlineNote: "You create a game, and get a link for every other player.",
+    seatPerson: "a person", seatComputer: "a computer player", seatNone: "nobody", onlineCreate: "Create", onlineJoin: "Join",
+    onlineNeedsPerson: "An online game needs at least one other person.", onlineFailed: "That didn't work: the multiplayer server isn't answering properly.",
+    inviteNote: "Send each player their own link. Whoever opens it first gets the seat.", copyLink: "Copy", shareLink: "Share",
+    joinNote: (host, n) => `${host} invites you to a game for ${n} players.`, waitingToJoin: "Waiting for everyone to join...",
+    offline: "The connection is gone; trying again...", seatInvited: "invited", seatAway: "away",
+    inviteIsYours: "This invitation is for another player, and this browser is already in the game. To try it on one computer, open the link in another browser or a private window.",
+    seatTaken: "This invitation has already been used.", inviteNotValid: "This invitation isn't valid.", inviteDeclined: "You aren't in that game.",
+    roomGone: "This game no longer exists.", notInRoom: "You aren't in this game. Ask for an invitation.",
+    waitNext: name => `${name} starts the next game.`, yourTurnShort: "Your turn", gameOnline: "Online", gameForget: "Forget",
+    twoTabs: "Against yourself, in two tabs...", playerN: n => `Player ${n}`, twoTabsOpen: "Open player 2",
+    twoTabsNote: "Each tab is one player, and every move appears in the other at once. This game is only in this browser.",
+    twoTabsOpenNote: "Now open the tab for player 2. You can also copy this tab's address, with &seat=1 added.",
+    twoTabsComputers: "Computer players", twoTabsLevel: level => `${level}. This is fixed for the game; you can change it in the options first.`,
+    computerSuspect: name => `${name}'s move isn't what the computer would play. The game may have been tampered with, or a tab is running another version.`,
+    games: "My games...", noSavedGames: "No games have been kept yet.",
+    gameWith: n => n === 1 ? "Against 1 opponent" : `Against ${n} opponents`, gameFinished: "finished", gameOngoing: "in progress",
+    gamesPlayed: n => n === 1 ? "1 game finished" : `${n} games finished`, gameHere: "You are playing this game now.",
+    gameOpen: "Open", gameDelete: "Delete", gameDeleteAsk: "Delete this game? This can't be undone.",
+    gameUnknown: "This browser doesn't have this game. The address may not be quite right, or the game was played on another device.",
+    notAccepted: "That move couldn't be passed on. Please try again.",
     aboutText: `<p><b>Tile Rummy</b></p><p>A game with numbered tiles for you and one to three computer players, by the official rules of the well-known tile game. Everything runs in your browser; there is no server.</p>`,
     solverwasm: "The opponents' moves are worked out in a Web Worker, with WebAssembly.",
     solverjs: "The opponents' moves are worked out in a Web Worker, in JavaScript.",
@@ -533,6 +625,11 @@ const tileName = id => TILES[id].joker ? t("joker") : t("tileName", TILES[id].c,
 
 // --- settings ----------------------------------------------------------------
 
+function seatFromAddress(from) {
+  const seat = Number(from.get("seat") ?? 0);
+  return Number.isInteger(seat) && seat >= 0 && seat < 4 ? seat : 0;
+}
+
 const LEVELS = ["easy", "strong", "optimal"];
 const settings = {opponents: 3, level: "strong", timer: false};
 if (!TEST) try { Object.assign(settings, JSON.parse(localStorage.getItem("rummy.settings")) ?? {}); } catch {}
@@ -546,26 +643,53 @@ const saveSettings = () => { if (!TEST) try { localStorage.setItem("rummy.settin
 
 // --- the game ----------------------------------------------------------------
 
+// The state has two parts, kept apart so that the shared part could one day go
+// to other players as it is.
+//
+// `game` is what all players share, and is plain JSON: the racks, the pool, the
+// table, whose turn it is, what each player said, and the scores of the games so
+// far (sheet: [{points: [...], winner}]). During your turn it stays as it was
+// when the turn began, and your moves only reach it when you finish.
+//
+// `view` is this browser's own: your rack in the order you gave it, the table as
+// it looks during your unfinished turn, the tile you drew, the tiles just played,
+// the status bar's message, and the clock.
+let gameId = null, room = null, stopWatching = null;
+let mySeat = seatFromAddress(params);                         // which player this tab is
+let record = null;            // the record as last received; its state is `game`
 let game = null;
-let sheet = [];               // the scores of the games so far: [{points: [...], winner}]
+let view = null;
 const timers = new Set();
-const ui = {selected: new Set(), press: null, pendingRender: false, warnUntil: 0};
+const ui = {selected: new Set(), press: null, pendingRender: false, warnUntil: 0,
+            sent: -1, thought: -1, ended: -1,     // the turn a move was sent on, thought about, or a game's end shown
+            observing: false, lockPending: null, releaseLock: null,    // see "playing or watching"
+            computes: false, releaseComputing: null};                  // see "who computes"
 
 function later(fn, ms) {
   const id = setTimeout(() => { timers.delete(id); fn(); }, TEST ? 0 : ms);
   timers.add(id);
 }
-function shuffle(list) {
-  for (let i = list.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
-  }
-  return list;
-}
-const me = () => game.players[0];
+const me = () => game.players[mySeat];
 const current = () => game.players[game.current];
-const myTurn = () => game && !game.over && game.current === 0;
-const nameOf = p => p.human ? null : p.name;
+const myTurn = () => game && record.started !== false && !game.over && game.current === mySeat;
+// Your turn, not yet sent off, and this is the tab that plays.
+const canAct = () => myTurn() && ui.sent !== record.turn && !ui.observing && !ui.lockPending;
+// The name to show for a player: null for you, as the messages expect.
+const nameOf = p => p === me() ? null : p.name ?? record?.seats[game.players.indexOf(p)]?.name ?? t("opponent");
+const copyTable = table => table.map(set => set.slice());
+const shownTable = () => myTurn() && view.table && !ui.observing ? view.table : game.table;
+// Who sits where, for this browser: you at the bottom, and the others clockwise from your left.
+const playerAt = place => {
+  const n = game.players.length, i = SEATS[n - 1].indexOf(place);
+  return i < 0 ? null : game.players[(mySeat + i + 1) % n];
+};
+const newView = () => ({round: game.round, rack: me().rack.slice(), table: null, drawn: null, mySaid: null, recent: new Set(),
+                        status: ["starts", nameOf(current()), game.top], deadline: 0});
+// Brings your rack in line with the shared one, in the order you gave it, with new tiles at the end.
+function syncRack() {
+  const shared = new Set(me().rack), mine = new Set(view.rack);
+  view.rack = view.rack.filter(id => shared.has(id)).concat(me().rack.filter(id => !mine.has(id)));
+}
 
 // --- the computer players' moves --------------------------------------------------
 //
@@ -598,237 +722,458 @@ if (params.get("solver") !== "main" && typeof Worker === "function") {
 }
 
 // A computer player's move (see computerMove in rules.js), as a promise.
-function thinkOf(table, rack, melded, level) {
+// In a game of several people it must come out the same in every browser (pinned).
+function thinkOf(table, rack, melded, level, pinned = false) {
   const here = () => computerMove(table, rack, melded, level);
   if (!brain.worker) return Promise.resolve(here());
   return new Promise(resolve => {
     const id = ++brain.asked;
     brain.waiting.set(id, move => resolve(move === undefined ? here() : move));
-    brain.worker.postMessage({id, table, rack, melded, level});
+    brain.worker.postMessage({id, table, rack, melded, level, pinned});
   });
 }
 
-// --- keeping the game ------------------------------------------------------------
+// --- keeping the games -----------------------------------------------------------
 //
-// The game is kept in the browser at the start of every turn and after each of
-// your moves, so a reload carries on where it was: an accidental one, a phone
-// that dropped the page, or a development server that reloads on every change.
-// It is not kept the moment a turn ends, so a reload then gives that turn
-// back as it began, never a second one. With ?test it is only kept with &keep.
+// Every game has an id, in the address (?game=k7f3x9), and is kept in this browser
+// under that id, with this browser's view of it, whenever either changes. So a
+// reload carries on where it was: an accidental one, a phone that dropped the
+// page, or a development server that reloads on every change. Without an id in
+// the address, the page opens the game played last. With ?test it is only kept
+// with &keep, apart from any real games.
 const KEEP = !TEST || params.has("keep");
-const GAME_KEY = TEST ? "rummy.test-game" : "rummy.game";
+const LOCKS = TEST && params.has("nolocks") ? null : navigator.locks ?? null;
+const STORE = TEST ? "rummy.test." : "rummy.";
+const GAME_PREFIX = STORE + "game.", VIEW_PREFIX = STORE + "view.", LAST_KEY = STORE + "last";
+const ROOM_PREFIX = STORE + "room.", INVITES_PREFIX = STORE + "invites.";     // online games: see "playing online"
+const FINISHED_GAMES_KEPT_MS = 60 * 24 * 3600 * 1000;
+const MOST_GAMES = 20, UNTOUCHED_WITHOUT_LOCKS_MS = 3600 * 1000;
+const GAME_ID = /^[a-z2-7]{6,32}$/;
 
-function saveGame() {
-  if (!KEEP || !game) return;
+function newGameId() {
+  const letters = "abcdefghijklmnopqrstuvwxyz234567";
+  return Array.from(crypto.getRandomValues(new Uint8Array(10)), byte => letters[byte % 32]).join("");
+}
+
+// A game's record has its own place, written only by whoever ends a turn, and each
+// seat's view has its own, so that tabs in different seats don't overwrite each other.
+function saveRecord(news, updated = Date.now()) {
+  if (!KEEP || !gameId || room?.online) return;         // an online game's record is on the server
   try {
-    localStorage.setItem(GAME_KEY, JSON.stringify({version: 1, game: {...game, recent: [...game.recent]}, sheet}));
+    localStorage.setItem(GAME_PREFIX + gameId, JSON.stringify({version: 3, record: news, updated}));
+  } catch {}
+}
+function saveGame() {
+  if (!KEEP || !gameId || !view || ui.observing) return;
+  try {
+    localStorage.setItem(`${VIEW_PREFIX}${gameId}.${mySeat}`, JSON.stringify({...view, recent: [...view.recent]}));
+    localStorage.setItem(LAST_KEY, JSON.stringify(room?.online ? {room: gameId} : {id: gameId, seat: mySeat}));
+  } catch {}
+}
+function readView(id, seat) {
+  if (!KEEP) return null;
+  try { return JSON.parse(localStorage.getItem(`${VIEW_PREFIX}${id}.${seat}`)); } catch { return null; }
+}
+
+// A kept game, if there is a good one with this id.
+function readGame(id) {
+  if (!KEEP || !GAME_ID.test(id ?? "")) return null;
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(GAME_PREFIX + id)); } catch { return null; }
+  const kept = saved?.version === 3 ? saved.record?.state : null;
+  if (!Array.isArray(kept?.players) || !Array.isArray(kept.table) || !Array.isArray(kept.pool) || !Array.isArray(kept.sheet)) return null;
+  const all = [...kept.players.flatMap(p => p.rack), ...kept.table.flat(), ...kept.pool].sort((a, b) => a - b);
+  if (all.length !== TILES.length || all.some((tileId, i) => tileId !== i)) return null;   // not a whole game
+  return saved;
+}
+
+// All kept games, the latest first.
+function listGames() {
+  const games = [];
+  if (!KEEP) return games;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key.startsWith(GAME_PREFIX)) continue;
+    const id = key.slice(GAME_PREFIX.length), saved = readGame(id);
+    if (saved) games.push({id, state: saved.record.state, updated: saved.updated ?? 0});
+  }
+  return games.sort((a, b) => b.updated - a.updated);
+}
+function deleteGame(id) {
+  try {
+    localStorage.removeItem(GAME_PREFIX + id);
+    for (let seat = 0; seat < 4; seat++) localStorage.removeItem(`${VIEW_PREFIX}${id}.${seat}`);
+  } catch {}
+}
+// Finished games nobody has opened for a long time don't stay for ever.
+function forgetOldGames() {
+  for (const {id, state, updated} of listGames()) {
+    if (state.over && Date.now() - updated > FINISHED_GAMES_KEPT_MS) deleteGame(id);
+  }
+}
+// A game for one person that nobody has played in yet: their line still says what
+// they drew for who starts. It isn't worth keeping once you have left it.
+const untouched = state => !state.over && !state.sheet.length
+  && state.players.filter(p => p.human).length === 1 && state.players.find(p => p.human).said?.[0] === "picked";
+
+// Keeps the number of games down, leaving alone the one open here and any open in
+// another tab: games nobody played in go, and then, above the limit, the oldest,
+// finished ones first.
+async function tidyGames() {
+  if (!KEEP) return;
+  let held = null;
+  try { held = (await LOCKS?.query())?.held.map(lock => lock.name) ?? null; } catch {}
+  const openElsewhere = id => held?.some(name => name.startsWith(`${STORE}play.${id}.`));
+  const removable = () => listGames().filter(({id}) => id !== gameId && !openElsewhere(id));
+  for (const {id, state, updated} of removable()) {
+    // Without locks there is no telling whether another tab has it, so give it time.
+    if (untouched(state) && (held || Date.now() - updated > UNTOUCHED_WITHOUT_LOCKS_MS)) deleteGame(id);
+  }
+  const excess = listGames().length - MOST_GAMES;
+  if (excess > 0) {
+    const oldestFirst = removable().sort((a, b) => Number(b.state.over) - Number(a.state.over) || a.updated - b.updated);
+    for (const {id} of oldestFirst.slice(0, excess)) deleteGame(id);
+  }
+}
+
+// Whatever no game needs any more: a view whose game is gone, and what older
+// versions of this page kept, which this one can't read.
+function forgetLeftovers() {
+  if (!KEEP) return;
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(VIEW_PREFIX)) continue;
+      const id = key.slice(VIEW_PREFIX.length).split(".")[0];
+      if (localStorage.getItem(GAME_PREFIX + id) === null && localStorage.getItem(ROOM_PREFIX + id) === null) localStorage.removeItem(key);
+    }
+    if (!TEST) localStorage.removeItem("rummy.game");
+    else localStorage.removeItem("rummy.test-game");
   } catch {}
 }
 
-// Carries on with the kept game if there is one for this number of players;
-// a finished one goes on to the next game, with its scores.
-function resumeGame() {
-  if (!KEEP) return false;
-  let saved;
-  try { saved = JSON.parse(localStorage.getItem(GAME_KEY)); } catch { return false; }
-  const kept = saved?.version === 1 ? saved.game : null;
-  if (!kept || kept.players?.length !== settings.opponents + 1) return false;
-  const all = [...kept.players.flatMap(p => p.rack), ...kept.table.flat(), ...kept.pool].sort((a, b) => a - b);
-  if (all.length !== TILES.length || all.some((id, i) => id !== i)) return false;   // not a whole game: start afresh
-  sheet = Array.isArray(saved.sheet) ? saved.sheet : [];
-  if (kept.over) { newGame(false); return true; }
-  game = {...kept, recent: new Set(kept.recent)};
-  game.players[0].name = t("you");
-  if (myTurn()) {               // your turn, with the moves you had made in it
-    startClock();
-    render();
-  } else {                      // an opponent's turn begins again
-    beginTurn();
-  }
-  return true;
+const addressOf = (id, seat) => {
+  const url = new URL(location.href);
+  url.searchParams.set("game", id);
+  if (seat) url.searchParams.set("seat", seat); else url.searchParams.delete("seat");
+  return url;
+};
+function setAddress(id, push) {
+  const url = addressOf(id, mySeat);
+  if (url.href !== location.href) history[push ? "pushState" : "replaceState"](null, "", url);
 }
 
-function newGame(clearScores) {
-  for (const id of timers) clearTimeout(id);
+// --- opening a game -----------------------------------------------------------------
+
+// A computer player's level is the seat's in a game of several people, and so the
+// same for everyone; with one person, it follows the options.
+const seatsOf = state => {
+  const many = state.players.filter(p => p.human).length > 1;
+  return state.players.map(p => p.human ? {kind: "person", name: p.name} : {kind: "computer", name: p.name, ...(many ? {level: settings.level} : {})});
+};
+const severalPeople = () => game.players.filter(p => p.human).length > 1;
+
+// Lets go of the game that is open, and of anything still to happen in it.
+function closeGame() {
+  for (const timer of timers) clearTimeout(timer);
   timers.clear();
   brain.turn++;
   stopClock();
-  if (clearScores) sheet = [];
-  const pool = shuffle(TILES.map(tile => tile.id));
-  const players = [{human: true, seat: "bottom", name: t("you")},
-                   ...SEATS[settings.opponents].map((seat, i) => ({human: false, seat, name: NAMES[i]}))];
-  for (const p of players) Object.assign(p, {rack: pool.splice(0, 14), melded: false, said: null});
-  // Everyone draws a tile; the highest starts, and a tie draws again.
-  let picks, top;
-  do {
-    const bag = shuffle(TILES.filter(tile => !tile.joker).map(tile => tile.v));
-    picks = players.map((_, i) => bag[i]);
-    top = Math.max(...picks);
-  } while (picks.filter(v => v === top).length > 1);
-  const starter = picks.indexOf(top);
-  players.forEach((p, i) => { if (!p.human) p.said = ["picked", picks[i]]; });
-  game = {players, pool, table: [], current: starter, over: false, passes: 0,
-          start: {table: [], rack: players[starter].rack.slice(), melded: false},
-          recent: new Set(), drawn: null, status: ["starts", nameOf(players[starter]), top], deadline: 0};
+  closeDialog();
+  stopWatching?.();
+  stopWatching = null;
+  ui.releaseLock?.();
+  ui.releaseLock = ui.lockPending = null;
+  stopComputing();
+  ui.observing = false;
   ui.selected.clear();
+  ui.sent = ui.thought = ui.ended = -1;
+  record = game = view = null;
+  // With no game open, the table stays empty.
+  for (const el of document.querySelectorAll(".seat")) el.hidden = true;
+  $("#table").replaceChildren();
+  $("#status").textContent = $("#pool").textContent = "";
+}
+
+function openGame(id, firstRecord, {seat = 0, savedView = null, kept = false, push = false} = {}) {
+  // Leaving a game nobody played in, with no tiles moved yet: it isn't kept.
+  const leaving = !room?.online && gameId !== id && game && untouched(game) && !(myTurn() && (placedNow().size || tableChanged())) ? gameId : null;
+  closeGame();
+  if (leaving) deleteGame(leaving);
+  gameId = id;
+  mySeat = firstRecord.state.players[seat]?.human ? seat : 0;
+  // A kept game may be open in another tab already, so wait to hear before playing it.
+  claimPlay(id, {wait: kept});
+  room = createLocalRoom({record: firstRecord, delay: TEST ? Number(params.get("delay") ?? 0) : 0,
+                          keep: saveRecord, latest: () => readGame(gameId)?.record})(mySeat);
+  saveRecord(firstRecord);                 // when this game was last opened counts too
+  setAddress(id, push);
+  receive(firstRecord, savedView);
+  stopWatching = room.watch(news => receive(news));
+}
+
+function openKeptGame(id, {seat = 0, push = false} = {}) {
+  const saved = readGame(id);
+  if (saved) openGame(id, saved.record, {seat, savedView: readView(id, seat), kept: true, push});
+  return Boolean(saved);
+}
+
+// A new game, under a new id. The one before stays in the list of games.
+function newGame() {
+  const people = TEST ? Number(params.get("people") ?? 1) : 1;
+  const players = [{human: true}, ...SEATS[settings.opponents].map((_, i) => ({human: i + 1 < people, name: NAMES[i]}))];
+  startGame(players, TEST ? seatFromAddress(params) : 0);
+}
+function startGame(players, seat = 0) {
+  const state = dealGame(players, random).game;
+  openGame(newGameId(), {seats: seatsOf(state), current: whoWrites(state), turn: 0, state}, {seat, push: Boolean(game)});
+  tidyGames();
+}
+
+// A game of two tabs: you against yourself, each tab in its own seat, with any
+// computer players.
+function newTwoTabGame(computers = 0) {
+  startGame([{human: true, name: t("playerN", 1)}, {human: true, name: t("playerN", 2)},
+             ...NAMES.slice(0, computers).map(name => ({human: false, name}))]);
+  showSecondTab();
+}
+function askTwoTabs() {
+  const form = document.createElement("form");
+  form.innerHTML = `<p>${t("twoTabsNote")}</p><fieldset><legend>${t("twoTabsComputers")}</legend>
+    ${[0, 1, 2].map(n => `<label><input type="radio" name="computers" value="${n}"${n ? "" : " checked"}> ${n}</label>`).join("")}
+    <p class="note">${t("twoTabsLevel", t(settings.level))}</p></fieldset>`;
+  dialog(t("twoTabs").replace("...", ""), form, [
+    {label: t("ok"), default: true, action: () => newTwoTabGame(Number(new FormData(form).get("computers")))},
+    {label: t("cancel"), cancel: true},
+  ]);
+}
+// How to open the other player's tab. window.open needs a click, which this comes from.
+const secondTabAddress = () => addressOf(gameId, mySeat === 0 ? 1 : 0).href;
+function showSecondTab() {
+  dialog(t("twoTabs").replace("...", ""), `<p>${t("twoTabsOpenNote")}</p>`, [
+    {label: t("twoTabsOpen"), default: true, action: () => window.open(secondTabAddress(), "_blank")},
+    {label: t("close"), cancel: true},
+  ]);
+}
+
+// The next game after a finished one, under the same id, with the scores.
+function nextRound() {
+  if (!game?.over) return;
+  const players = game.players.map(({human, name}) => ({human, name}));
+  const state = dealGame(players, random, game.sheet, game.round + 1).game;
+  const writer = record.current;
+  room.play({state, current: whoWrites(state)}, writer === mySeat ? {} : {forSeat: writer}).catch(refused);
+}
+// Whether this tab can start the next game: the winner does, or anyone for a computer player.
+const canStartNext = () => !ui.observing && (record.current === mySeat || record.seats[record.current].kind === "computer");
+
+function refused(e) {
+  ui.sent = ui.thought = -1;
+  console.warn(e);
+  if (e.code !== "stale") message(t("notAccepted"));          // if stale, the newer record is on its way
+}
+
+// --- receiving a record -------------------------------------------------------------
+//
+// Every change to the game comes in here: when it opens, after a move of yours,
+// after a computer player's, and from another tab. What this browser shows
+// follows from the record before and the one that came in.
+function receive(news, savedView) {
+  const before = record;
+  if (before && (news.turn < before.turn || JSON.stringify(news) === JSON.stringify(before))) return;
+  const complaint = before ? referee(before, news) : null;
+  if (complaint?.reason === "not-a-game") {        // nothing that can be shown, so it stays as it was
+    console.warn("Tile Rummy: this isn't a game:", news);
+    message(t("moveSuspect", nameOf(game.players[complaint.seat])));
+    return;
+  }
+  record = news;
+  game = news.state;
+
+  if (!before) view = restoredView(savedView);
+  else if (view.round !== game.round) {
+    view = newView();
+    closeDialog();                                            // someone else went on from the score sheet
+  } else noteRecent(before, news);
+
+  const newTurn = myTurn() && (before ? news.turn !== before.turn || view.table === null : !savedView);
+  if (newTurn) {
+    view.table = copyTable(game.table);
+    view.status = null;
+    syncRack();
+    ui.selected.clear();
+    if (!ui.observing) startClock();
+  } else if (myTurn()) {
+    if (!before && !ui.observing) startClock();               // your unfinished turn, reopened
+  } else {
+    view.table = null;
+    stopClock();
+    syncRack();
+  }
+  if (game.over && ui.ended !== news.turn) {
+    ui.ended = news.turn;
+    gameEnded();
+  }
   saveGame();
   render();
-  later(beginTurn, starter === 0 ? 0 : 1200);
-}
-
-function beginTurn() {
-  const p = current();
-  game.start = {table: game.table.map(set => set.slice()), rack: p.rack.slice(), melded: p.melded};
-  saveGame();
-  if (p.human) {
-    game.status = null;
-    ui.selected.clear();
-    startClock();
-    render();
-  } else {
-    // The thinking starts at once, and the move comes after the pause or the
-    // thinking, whichever is longer; unless by then the turn is no longer
-    // this one (a new game, say).
-    render();
-    const turn = ++brain.turn;
-    const thought = thinkOf(game.table, p.rack, p.melded, settings.level);
-    later(() => thought.then(move => { if (turn === brain.turn) computerTurn(move); }), THINK);
+  followUp();
+  if (complaint) {
+    console.warn("Tile Rummy: the referee objects to this turn:", complaint.reason, before, news);
+    message(t("moveSuspect", nameOf(game.players[complaint.seat])));
+  } else if (before) {
+    repeatComputerMove(before, news);
   }
 }
 
-function nextTurn() {
-  if (game.over) return;
-  game.current = (game.current + 1) % game.players.length;
-  beginTurn();
+// The referee only sees whether a move is legal. A computer player's must also be the
+// one the solver gives, so every tab that didn't work it out itself repeats it.
+function repeatComputerMove(before, news) {
+  const seat = before.current, id = gameId;
+  if (news.restarted || news.turn !== before.turn + 1 || ui.observing || ui.sent === before.turn) return;
+  if (before.state.over || before.seats[seat].kind !== "computer" || !severalPeople()) return;
+  const player = before.state.players[seat];
+  thinkOf(before.state.table, player.rack, player.melded, before.seats[seat].level, true).then(move => {
+    if (gameId !== id) return;
+    const expected = stateAfterComputer(before.state, seat, move);
+    if (!sameState(expected.over ? expected : advanceTurn(expected), news.state)) {
+      console.warn("Tile Rummy: this isn't the solver's move:", seat, move, news);
+      message(t("computerSuspect", before.seats[seat].name));
+    }
+  });
 }
 
-// Draws a tile, or passes if the pool is empty; the game is over once everyone
-// in a row has had to pass.
-function drawFor(p, n = 1) {
-  if (!game.pool.length) {
-    p.said = ["saidPass"];
-    game.passes++;
-    if (game.passes >= game.players.length) { endGame(null); return false; }
-    return true;
+// Every browser is a referee: each new record is checked against the one before,
+// your own moves too, since this also catches mistakes in the game itself. A record
+// that is more than one turn on can't be checked, and a set-up for the tests isn't a turn.
+function referee(before, news) {
+  if (news.restarted || news.turn !== before.turn + 1) return null;
+  const seat = before.current;
+  const reason = checkTurn(before.state, news.state, seat) ?? (news.current !== whoWrites(news.state) ? "wrong-next-seat" : null)
+    ?? (JSON.stringify(news.seats) !== JSON.stringify(before.seats) ? "seats-changed" : null);
+  return reason ? {reason, seat} : null;
+}
+
+// What this browser kept of a game, if it still fits; or else a new view.
+function restoredView(saved) {
+  if (saved?.round !== game.round || !Array.isArray(saved?.rack)) return newView();
+  const kept = {...newView(), ...saved, recent: new Set(saved.recent)};
+  if (myTurn() && !sameTiles(kept)) {           // the unfinished turn doesn't add up: back to its start
+    kept.table = copyTable(game.table);
+    kept.rack = me().rack.slice();
   }
-  for (let i = 0; i < n && game.pool.length; i++) {
-    const id = game.pool.pop();
-    p.rack.push(id);
-    if (p.human) game.drawn = id;
-  }
-  p.said = n === 3 ? ["saidPenalty"] : p.human ? ["saidDrewTile", game.drawn] : ["saidDraw"];
-  return true;
+  return kept;
+}
+// Whether your unfinished turn has just the tiles it began with, on the table and the rack.
+function sameTiles({table, rack}) {
+  if (!table) return false;
+  const sorted = list => [...list].sort((a, b) => a - b).join();
+  return sorted([...table.flat(), ...rack]) === sorted([...game.table.flat(), ...me().rack]);
+}
+// The tiles others played since your turn are marked; your own turn clears them.
+function noteRecent(before, news) {
+  if (news.restarted) return;
+  if (before.current === mySeat) { view.recent.clear(); return; }
+  const had = new Set(before.state.table.flat());
+  for (const id of news.state.table.flat()) if (!had.has(id)) view.recent.add(id);
+}
+
+// If the next move is a computer player's, ask for it. The thinking starts at once,
+// and the move comes after the pause or the thinking, whichever is longer; unless
+// by then the turn is no longer this one (a new game, say).
+function followUp() {
+  const {turn, current: seat, seats} = record;
+  if (!computesHere()) return;
+  if (game.over || seats[seat].kind !== "computer" || ui.thought === turn) return;
+  ui.thought = turn;
+  const token = ++brain.turn, state = game, player = state.players[seat];
+  const thought = thinkOf(state.table, player.rack, player.melded, seats[seat].level ?? settings.level, severalPeople());
+  later(() => thought.then(move => {
+    if (token === brain.turn && record.turn === turn) computerTurn(state, seat, move);
+  }), PAUSE + THINK);
+}
+
+// Writes the state after a seat's turn. Waiting is up to whoever shows it.
+function endTurn(state, seat) {
+  ui.sent = record.turn;
+  const next = state.over ? state : advanceTurn(state);
+  room.play({state: next, current: whoWrites(next)}, seat === mySeat ? {} : {forSeat: seat}).catch(refused);
 }
 
 // Plays the move a computer player came up with, or draws if there is none.
-function computerTurn(move) {
-  if (game.over) return;
-  const p = current();
-  if (move) {
-    const opening = !p.melded;
-    game.table = move.table;
-    p.rack = move.rack;
-    p.melded = true;
-    game.passes = 0;
-    for (const id of move.placed) game.recent.add(id);
-    p.said = opening ? ["saidMeld", meldPoints(move.table, move.placed)] : ["saidPlay", move.placed.length];
-    if (!p.rack.length) { endGame(game.current); return; }
-  } else if (!drawFor(p)) {
-    return;
-  }
-  render();
-  later(nextTurn, PAUSE);
+function computerTurn(state, seat, move) {
+  endTurn(stateAfterComputer(state, seat, move), seat);
+}
+function stateAfterComputer(state, seat, move) {
+  const error = move && checkPlay(state, seat, move.table, move.rack);
+  if (error) console.warn("Tile Rummy: a computer player's move was refused", error, move);
+  return move && !error ? playTiles(state, seat, move.table, move.rack).game : drawTiles(state, seat).game;
 }
 
-// The points of the sets made only of these tiles: what counts for a first meld.
-function meldPoints(table, placed) {
-  const mine = new Set(placed);
-  return table.filter(set => set.every(id => mine.has(id))).reduce((s, set) => s + (analyse(set)?.points ?? 0), 0);
+// You draw, or pass if the pool is empty. Only you see which tile it was.
+function drawForMe(count = 1) {
+  const result = drawTiles(game, mySeat, count);
+  const last = result.drawn.at(-1) ?? null;
+  view.drawn = last;
+  view.mySaid = last !== null && count !== 3 ? ["saidDrewTile", last] : null;
+  return result.game;
 }
 
 // The tiles you have put on the table this turn.
 function placedNow() {
   if (!myTurn()) return new Set();
-  const rack = new Set(me().rack);
-  return new Set(game.start.rack.filter(id => !rack.has(id)));
+  const rack = new Set(view.rack);
+  return new Set(me().rack.filter(id => !rack.has(id)));
 }
-const tableChanged = () => JSON.stringify(game.table) !== JSON.stringify(game.start.table);
+const tableChanged = () => JSON.stringify(view.table) !== JSON.stringify(game.table);
 
 function undoTurn() {
-  game.table = game.start.table.map(set => set.slice());
-  const rack = new Set(me().rack);
-  // Keep the rack in the order you gave it, with the tiles coming back at the end.
-  me().rack = me().rack.filter(id => game.start.rack.includes(id))
-    .concat(game.start.rack.filter(id => !rack.has(id)));
+  view.table = copyTable(game.table);
+  syncRack();            // keeps the rack in the order you gave it, with the tiles coming back at the end
   ui.selected.clear();
 }
 
 // The big button: Done if you have played tiles, or else draw (or pass).
 function finishTurn() {
-  if (!myTurn()) return;
+  if (!canAct()) return;
   const placed = placedNow();
   if (!placed.size) {
     const changed = tableChanged();
     undoTurn();
-    if (!drawFor(me())) return;
-    game.status = changed ? ["nothingFromRack"] : me().said[0] === "saidPass" ? ["youPassed"] : ["youDrew", game.drawn];
-    return endMyTurn();
+    const next = drawForMe();
+    // No tile drawn means a pass; the line can't tell, as the pass that ends a game says who won.
+    view.status = changed ? ["nothingFromRack"] : view.drawn === null ? ["youPassed"] : ["youDrew", view.drawn];
+    return sendMyTurn(next);
   }
-  if (game.table.some(set => !analyse(set))) return message(t("errInvalid"));
-  const opening = !game.start.melded;
-  if (opening) {
-    const points = meldPoints(game.table, [...placed]);
-    if (points < 30) return message(t("errMeld", points));
-    me().said = ["saidMeld", points];
-  } else {
-    me().said = ["saidPlay", placed.size];
-  }
-  me().melded = true;
-  game.passes = 0;
-  game.drawn = null;
-  if (!me().rack.length) { stopClock(); endGame(0); return; }
-  game.status = null;
-  endMyTurn();
+  const error = checkPlay(game, mySeat, view.table, view.rack);
+  if (error) return message(t(...error));
+  view.mySaid = null;
+  view.drawn = null;
+  view.status = null;
+  sendMyTurn(playTiles(game, mySeat, view.table, view.rack).game);
 }
 
-function endMyTurn() {
+function sendMyTurn(next) {
   stopClock();
-  game.recent.clear();
   ui.selected.clear();
+  endTurn(next, mySeat);
   render();
-  later(nextTurn, PAUSE);
 }
 
 function timeUp() {
-  if (!myTurn()) return;
+  if (!canAct()) return;
   closeDialog();
   const moved = placedNow().size > 0 || tableChanged();
   undoTurn();
-  if (!drawFor(me(), moved ? 3 : 1)) return;
-  game.status = [moved ? "timeUpPenalty" : "timeUp"];
-  endMyTurn();
+  const next = drawForMe(moved ? 3 : 1);
+  view.status = [moved ? "timeUpPenalty" : "timeUp"];
+  sendMyTurn(next);
 }
 
-function endGame(winner) {
-  game.over = true;
-  stopClock();
-  const values = game.players.map(p => rackValue(p.rack));
-  let points;
-  const blocked = winner === null;
-  if (blocked) {
-    const low = Math.min(...values);
-    winner = values.indexOf(low);
-    points = values.map(v => low - v);
-  } else {
-    points = values.map(v => -v);
-  }
-  points[winner] = -points.reduce((s, x, i) => i === winner ? s : s + x, 0);
-  sheet.push({points, winner});
-  game.players[winner].said = ["saidOut"];
-  game.status = [blocked ? "wonBlocked" : "wonOut", nameOf(game.players[winner])];
-  saveGame();
-  render();
-  later(() => showScores(game.status), 900);
+// Shows the end of the game; the rules have already scored it.
+function gameEnded() {
+  const {winner, blocked} = game.result;
+  if (winner === mySeat) view.mySaid = null;
+  view.status = [blocked ? "wonBlocked" : "wonOut", nameOf(game.players[winner])];
+  later(() => showScores(view.status), 900);
 }
 
 // --- moving tiles --------------------------------------------------------------
@@ -836,10 +1181,10 @@ function endGame(winner) {
 // Whether you may pick up this tile: your rack's always (to rearrange it); on
 // your turn also the table's, but before your first meld only your own new ones.
 function canMove(id) {
-  if (!game || game.over) return false;
-  if (me().rack.includes(id)) return true;
-  if (!myTurn()) return false;
-  return game.start.melded || placedNow().has(id);
+  if (!game || game.over || ui.observing) return false;
+  if (view.rack.includes(id)) return true;
+  if (!canAct()) return false;
+  return me().melded || placedNow().has(id);
 }
 
 // Moves tiles to a set ({set: i, at}), a new set ({set: "new"}) or the rack
@@ -848,17 +1193,17 @@ function canMove(id) {
 function moveTiles(ids, target) {
   const moving = new Set(ids);
   if (target.rack) {
-    if (ids.some(id => !me().rack.includes(id) && !(myTurn() && game.start.rack.includes(id)))) return warn("errBack");
+    if (ids.some(id => !view.rack.includes(id) && !(canAct() && me().rack.includes(id)))) return warn("errBack");
   } else {
-    if (!myTurn()) return;
-    if (target.set !== "new" && !game.start.melded) {
+    if (!canAct()) return;
+    if (target.set !== "new" && !me().melded) {
       const placed = placedNow();
-      if (game.table[target.set].some(id => !placed.has(id) && !moving.has(id))) return warn("errLocked");
+      if (view.table[target.set].some(id => !placed.has(id) && !moving.has(id))) return warn("errLocked");
     }
   }
-  const rack = me().rack.filter(id => !moving.has(id));
+  const rack = view.rack.filter(id => !moving.has(id));
   const table = [];
-  game.table.forEach((set, i) => {
+  shownTable().forEach((set, i) => {
     let rest = set.filter(id => !moving.has(id));
     if (i === target.set) {
       rest.splice(Math.min(target.at, rest.length), 0, ...ids);
@@ -878,18 +1223,19 @@ function moveTiles(ids, target) {
   });
   if (target.set === "new") table.push(normalize(ids));
   if (target.rack) rack.splice(Math.min(target.at, rack.length), 0, ...ids);
-  game.table = table;
-  me().rack = rack;
+  if (canAct()) view.table = table;
+  view.rack = rack;
   ui.selected.clear();
-  if (game.drawn !== null && !rack.includes(game.drawn)) game.drawn = null;
-  if (myTurn()) saveGame();
+  if (view.drawn !== null && !rack.includes(view.drawn)) view.drawn = null;
+  saveGame();
   render();
 }
 
 function sortRack(byColour) {
+  if (!game || ui.observing) return;
   const key = id => TILES[id].joker ? [99, 99] : byColour ? [TILES[id].c, TILES[id].v] : [TILES[id].v, TILES[id].c];
-  me().rack.sort((a, b) => { const [x, y] = [key(a), key(b)]; return x[0] - y[0] || x[1] - y[1]; });
-  if (myTurn()) saveGame();
+  view.rack.sort((a, b) => { const [x, y] = [key(a), key(b)]; return x[0] - y[0] || x[1] - y[1]; });
+  saveGame();
   render();
 }
 
@@ -923,68 +1269,77 @@ function render() {
   const mine = myTurn(), placed = placedNow();
 
   for (const seat of ["left", "top", "right"]) {
-    const el = $(`#seat-${seat}`), p = game.players.find(p => p.seat === seat);
+    const el = $(`#seat-${seat}`), p = playerAt(seat);
     el.hidden = !p;
     if (!p) continue;
     el.classList.toggle("active", !game.over && current() === p);
-    el.querySelector(".name").textContent = p.name;
-    el.querySelector(".count").textContent = t("tiles", p.rack.length);
+    const seatInfo = record.seats[game.players.indexOf(p)];
+    const invited = seatInfo?.kind === "person" && room?.online && !seatInfo.uid;
+    const away = !invited && seatInfo?.kind === "person" && room?.online && room.present && !room.present.includes(game.players.indexOf(p));
+    el.querySelector(".name").textContent = nameOf(p);
+    el.querySelector(".count").textContent = invited ? t("seatInvited") : away ? `${t("tiles", p.rack.length)} · ${t("seatAway")}` : t("tiles", p.rack.length);
     el.querySelector(".said").textContent = say(p.said);
     // Face down while the game is on; face up once it is over.
     el.querySelector(".hand").replaceChildren(...p.rack.map(id => game.over ? tileEl(id) : backEl()));
   }
   const bottom = $("#seat-bottom");
+  bottom.hidden = false;
   bottom.classList.toggle("active", mine);
   bottom.querySelector(".name").textContent = t("you");
-  bottom.querySelector(".said").textContent = say(me().said);
+  // Your own draw for who starts isn't news to you.
+  bottom.querySelector(".said").textContent = say(view.mySaid ?? (me().said?.[0] === "picked" ? null : me().said));
+  $("#observing").hidden = !ui.observing;
 
   const table = $("#table");
   table.replaceChildren();
-  game.table.forEach((set, i) => {
+  const shown = shownTable();
+  shown.forEach((set, i) => {
     const el = document.createElement("div"), a = analyse(set);
     el.className = "set";
     el.dataset.set = i;
     if (!a) el.classList.add("bad");
-    if (mine && !game.start.melded && set.some(id => !placed.has(id))) el.classList.add("locked");
+    if (mine && !me().melded && set.some(id => !placed.has(id))) el.classList.add("locked");
     set.forEach((id, j) => {
       const tile = tileEl(id, a?.reps[j]);
       if (placed.has(id)) tile.classList.add("mine");
-      if (game.recent.has(id)) tile.classList.add("recent");
+      if (view.recent.has(id)) tile.classList.add("recent");
       if (ui.selected.has(id)) tile.classList.add("sel");
       if (canMove(id)) tile.classList.add("can");
       el.append(tile);
     });
     table.append(el);
   });
-  if (mine) {
+  if (mine && !ui.observing) {
     const el = document.createElement("div");
     el.className = "newset";
     el.textContent = "+ " + t("newSet");
     table.append(el);
-  } else if (!game.table.length) {
+  } else if (!shown.length) {
     const el = document.createElement("div");
     el.className = "empty-table";
     el.textContent = t("emptyTable");
     table.append(el);
   }
 
-  $("#rack").replaceChildren(...me().rack.map(id => {
+  $("#rack").replaceChildren(...view.rack.map(id => {
     const tile = tileEl(id);
-    if (id === game.drawn) tile.classList.add("new");
+    if (id === view.drawn) tile.classList.add("new");
     if (ui.selected.has(id)) tile.classList.add("sel");
-    if (!game.over) tile.classList.add("can");
+    if (!game.over && !ui.observing) tile.classList.add("can");
     return tile;
   }));
 
   const go = $("#go");
   go.textContent = placed.size ? t("done") : game.pool.length ? t("draw") : t("pass");
-  go.disabled = !mine;
-  $("#reset").disabled = !mine || (!placed.size && !tableChanged());
-  $("#sort-num").disabled = $("#sort-color").disabled = game.over;
+  go.disabled = !canAct();
+  $("#reset").disabled = !canAct() || (!placed.size && !tableChanged());
+  $("#sort-num").disabled = $("#sort-color").disabled = game.over || ui.observing;
 
   renderStatus();
+  setTitle();
+  showMenuItems();
   $("#pool").textContent = t("pool", game.pool.length);
-  for (const b of document.querySelectorAll("[data-act=opp]")) b.setAttribute("aria-checked", Number(b.dataset.n) === settings.opponents);
+  for (const b of document.querySelectorAll("[data-act=opp]")) b.setAttribute("aria-checked", Number(b.dataset.n) === game.players.length - 1);
   requestAnimationFrame(layoutHands);
 }
 
@@ -992,12 +1347,14 @@ function renderStatus() {
   const el = $("#status");
   if (Date.now() < ui.warnUntil) return;
   el.classList.remove("warn");
-  let text = say(game.status);
+  let text = say(view.status);
+  if (ui.offline) text = t("offline");
+  else if (record.started === false) text = t("waitingToJoin");
   if (!text && myTurn()) {
-    text = !game.start.melded ? t("yourFirst", meldPoints(game.table, [...placedNow()]))
+    text = !me().melded ? t("yourFirst", meldPoints(shownTable(), [...placedNow()]))
          : game.pool.length ? t("yourTurn") : t("yourTurnEmpty");
   }
-  if (!text && !game.over) text = t("theirTurn", current().name);
+  if (!text && !game.over) text = t("theirTurn", nameOf(current()));
   el.textContent = text;
 }
 
@@ -1039,10 +1396,10 @@ addEventListener("resize", () => requestAnimationFrame(layoutHands));
 let clockTimer = 0;
 function startClock() {
   stopClock();
-  if (!settings.timer) return;
-  game.deadline = Date.now() + TURN_SECONDS * 1000;
+  if (!settings.timer || room?.online) return;       // online, each browser could only time itself
+  view.deadline = Date.now() + TURN_SECONDS * 1000;
   const tick = () => {
-    const left = Math.max(0, Math.ceil((game.deadline - Date.now()) / 1000));
+    const left = Math.max(0, Math.ceil((view.deadline - Date.now()) / 1000));
     $("#clock").textContent = `⏱ ${left}`;
     if (left <= 0) { stopClock(); timeUp(); }
   };
@@ -1205,6 +1562,7 @@ function message(text) {
 }
 
 function showScores(result) {
+  if (!game) return;
   const box = document.createElement("div");
   if (result) {
     const p = document.createElement("p");
@@ -1212,12 +1570,13 @@ function showScores(result) {
     p.textContent = say(result);
     box.append(p);
   }
+  const sheet = game.sheet;
   if (!sheet.length) {
     box.append(t("noGames"));
   } else {
     const table = document.createElement("table");
     table.className = "sheet";
-    const names = game.players.map(p => p.human ? t("you") : p.name);
+    const names = game.players.map(p => nameOf(p) ?? t("you"));
     const cell = (tag, text, cls) => { const c = document.createElement(tag); c.textContent = text; if (cls) c.className = cls; return c; };
     const row = (cells) => { const tr = document.createElement("tr"); tr.append(...cells); return tr; };
     const signed = n => n > 0 ? `+${n}` : String(n);
@@ -1230,8 +1589,13 @@ function showScores(result) {
     table.append(head, body, foot);
     box.append(table);
   }
-  const buttons = game.over
-    ? [{label: t("next"), default: true, action: () => newGame(false)}, {label: t("close"), cancel: true}]
+  if (result && game.over && !canStartNext() && room?.online) {
+    const p = document.createElement("p");
+    p.textContent = t("waitNext", nameOf(game.players[record.current]));
+    box.append(p);
+  }
+  const buttons = game.over && canStartNext()
+    ? [{label: t("next"), default: true, action: nextRound}, {label: t("close"), cancel: true}]
     : [{label: t("ok"), default: true}];
   dialog(t("scores").replace("...", ""), box, buttons);
 }
@@ -1271,14 +1635,232 @@ function showOptions() {
 function setOpponents(n) {
   settings.opponents = n;
   saveSettings();
-  newGame(true);
+  newGame();
 }
 
-// New game, from the menu or F2: ask first if there are scores to lose.
-function askNewGame(then = () => newGame(true)) {
-  if (!sheet.length && (!game || game.over || !game.players.some(p => p.melded))) { then(); return; }
-  dialog("Tile Rummy", `<p>${t("newGameAsk")}</p>`,
-         [{label: t("yes"), default: true, action: then}, {label: t("no"), cancel: true}]);
+// The list of this browser's games, to go back to one, or delete it.
+function showGames() {
+  const box = document.createElement("div");
+  const games = listGames().sort((a, b) => Number(b.id === gameId) - Number(a.id === gameId));   // the one you are in first
+  if (!games.length && !onlineGames().length) box.textContent = t("noSavedGames");
+  if (games.length >= MOST_GAMES - 2) {
+    const note = document.createElement("p");
+    note.className = "games-full";
+    note.textContent = t("gamesNearLimit", games.length, MOST_GAMES);
+    box.append(note);
+  }
+  for (const {id, updated, players} of onlineGames()) {
+    const row = document.createElement("div");
+    row.className = "game-row";
+    const about = document.createElement("div");
+    about.className = "game-about";
+    const here = id === gameId;
+    about.textContent = `${t("gameOnline")} · ${t("gameWith", players - 1)}`;
+    const when = document.createElement("div");
+    when.className = "game-when";
+    when.textContent = here ? t("gameHere") : new Date(updated).toLocaleString(lang, {dateStyle: "medium", timeStyle: "short"});
+    about.append(when);
+    row.append(about);
+    if (!here) {
+      const button = (key, action) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "btn small";
+        el.textContent = t(key);
+        el.addEventListener("click", action);
+        return el;
+      };
+      row.append(button("gameOpen", () => { closeDialog(); openOnline(id, true); }),
+                 button("gameForget", () => { forgetOnlineGame(id); showGames(); }));
+    }
+    box.append(row);
+  }
+  for (const {id, state, updated} of games) {
+    const row = document.createElement("div");
+    row.className = "game-row";
+    const about = document.createElement("div");
+    about.className = "game-about";
+    const here = id === gameId;
+    const scores = state.sheet.length ? ` · ${t("gamesPlayed", state.sheet.length)}` : "";
+    about.textContent = `${t("gameWith", state.players.length - 1)} · ${t(state.over ? "gameFinished" : "gameOngoing")}${scores}`;
+    const when = document.createElement("div");
+    when.className = "game-when";
+    when.textContent = here ? t("gameHere") : new Date(updated).toLocaleString(lang, {dateStyle: "medium", timeStyle: "short"});
+    about.append(when);
+    row.append(about);
+    if (!here) {
+      const button = (key, action) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "btn small";
+        el.textContent = STRINGS[lang][key] ? t(key) : key;
+        el.addEventListener("click", action);
+        return el;
+      };
+      const people = state.players.flatMap((p, seat) => p.human ? [seat] : []);
+      if (people.length > 1) for (const seat of people) row.append(button(state.players[seat].name ?? "gameOpen", () => openKeptGame(id, {seat, push: true})));
+      else row.append(button("gameOpen", () => openKeptGame(id, {push: true})));
+      row.append(button("gameDelete", () => askDelete(id)));
+    }
+    box.append(row);
+  }
+  const finished = games.filter(({id, state}) => state.over && id !== gameId);
+  const buttons = [{label: t("close"), default: true, cancel: true, action: () => { if (!game) newGame(); }}];
+  if (finished.length) buttons.unshift({label: t("deleteFinished", finished.length), action: () => askDeleteFinished(finished)});
+  dialog(t("games").replace("...", ""), box, buttons, true);
+}
+function askDeleteFinished(finished) {
+  dialog("Tile Rummy", `<p>${t("deleteFinishedAsk", finished.length)}</p>`, [
+    {label: t("yes"), action: () => { for (const {id} of finished) deleteGame(id); showGames(); }},
+    {label: t("no"), default: true, cancel: true, action: showGames},
+  ]);
+}
+function askDelete(id) {
+  dialog("Tile Rummy", `<p>${t("gameDeleteAsk")}</p>`, [
+    {label: t("yes"), action: () => { deleteGame(id); showGames(); }},
+    {label: t("no"), default: true, cancel: true, action: showGames},
+  ]);
+}
+
+// --- playing or watching ------------------------------------------------------------
+//
+// Only one tab plays a seat of a game. It holds a lock (Web Locks) for as long as
+// the game is open, and any other tab on that seat only watches: nothing it shows
+// can be moved, it computes nothing and keeps nothing, and follows the other tab
+// through the browser's storage. Play only moves when you press Play here, never
+// by itself: a tab being reloaded lets go of its lock for a moment, and shouldn't
+// come back to find the game gone. Without locks (they need https or localhost),
+// tabs just follow each other.
+function claimPlay(id, {wait = false, steal = false} = {}) {
+  if (!LOCKS) return;
+  const name = `${STORE}play.${id}.${mySeat}`;
+  let release, released = false;
+  const held = new Promise(resolve => { release = () => { released = true; resolve(); }; });
+  ui.releaseLock = release;
+  const open = () => !released && gameId === id;
+  let done;
+  const settled = new Promise(resolve => { done = resolve; });
+  if (wait) {
+    ui.lockPending = settled;
+    settled.then(() => {
+      if (ui.lockPending === settled) ui.lockPending = null;
+      if (open() && record) { render(); followUp(); }
+    });
+  }
+  const ask = (again) => LOCKS.request(name, steal ? {steal: true} : {ifAvailable: true}, lock => {
+    if (!lock) {
+      // A tab reloading may only just be letting go of its own lock: ask once more.
+      if (again) { setTimeout(() => ask(false).catch(lost), 150); return; }
+      if (open()) setObserving(true);
+      done();
+      return;
+    }
+    if (open()) {
+      setObserving(false);
+      if (game) claimComputing(id);
+    }
+    done();
+    return held;
+  });
+  const lost = e => {
+    // Another tab pressed Play here.
+    if (e?.name !== "AbortError") console.warn(e);
+    if (open()) setObserving(true);
+    done();
+  };
+  ask(!steal).catch(lost);
+}
+
+function setObserving(on) {
+  if (ui.observing === on) return;
+  ui.observing = on;
+  if (!game) return;
+  if (on) {                     // anything this tab was still doing stops here
+    for (const timer of timers) clearTimeout(timer);
+    timers.clear();
+    brain.turn++;
+    stopClock();
+    stopComputing();
+    ui.selected.clear();
+    view.table = null;
+    syncRack();
+  } else {
+    ui.thought = -1;
+    if (myTurn()) {
+      view.table = copyTable(game.table);
+      syncRack();
+      startClock();
+    }
+    saveGame();
+  }
+  render();
+  if (!on) followUp();
+}
+
+// With no game open: says why, and offers a new one or the list.
+function showNoGame(key) {
+  const buttons = [{label: t("newGame"), default: true, cancel: true, action: newGame}];
+  if (listGames().length) buttons.push({label: t("games").replace("...", ""), action: showGames});
+  dialog("Tile Rummy", `<p>${t(key)}</p>`, buttons);
+}
+// --- who computes -------------------------------------------------------------------
+//
+// With one person, their tab. With several, one tab computes for the computer players:
+// every tab that plays asks for a lock, the first gets it, and when that tab goes the
+// next one has it by itself. Without locks, the lowest seat of a person computes.
+function computesHere() {
+  if (ui.observing || ui.lockPending || record.started === false) return false;
+  if (!severalPeople()) return true;
+  // Online there are no shared locks: the lowest seat of a person who has the room open
+  // computes. If two ever do at once, the turn counter lets only one count.
+  if (room.online) return Boolean(room.present?.length) && Math.min(...room.present) === mySeat;
+  if (!LOCKS) return game.players.findIndex(p => p.human) === mySeat;
+  return ui.computes;
+}
+function claimComputing(id) {
+  if (!LOCKS || !severalPeople() || ui.releaseComputing) return;
+  const asking = new AbortController();
+  let release = () => {};
+  const held = new Promise(resolve => { release = resolve; });
+  ui.releaseComputing = () => { asking.abort(); release(); ui.computes = false; ui.releaseComputing = null; };
+  LOCKS.request(`${STORE}compute.${id}`, {signal: asking.signal}, () => {
+    if (gameId !== id || asking.signal.aborted) return;
+    ui.computes = true;
+    followUp();
+    return held;
+  }).catch(e => { if (e?.name !== "AbortError") console.warn(e); });
+}
+function stopComputing() {
+  ui.releaseComputing?.();
+}
+
+// An address with an id this browser doesn't have.
+const showUnknownGame = () => showNoGame("gameUnknown");
+
+// Stops the game that is open and deletes everything kept of it, after asking.
+function askStopGame() {
+  if (!game) return;
+  dialog(t("stopGame"), `<p>${t("stopGameAsk")}</p>`, [
+    {label: t("no"), default: true, cancel: true},
+    {label: t("stopGameYes"), action: () => {
+      const id = gameId;
+      leaveGame();
+      deleteGame(id);
+      try {
+        if (JSON.parse(localStorage.getItem(LAST_KEY))?.id === id) localStorage.removeItem(LAST_KEY);
+      } catch {}
+      showNoGame("gameStopped");
+    }},
+  ]);
+}
+// No game open any more, and none in the address.
+function leaveGame() {
+  closeGame();
+  gameId = null;
+  const url = new URL(location.href);
+  url.searchParams.delete("game");
+  url.searchParams.delete("seat");
+  history.replaceState(null, "", url);
 }
 
 function openMenu() {
@@ -1306,8 +1888,13 @@ for (const item of document.querySelectorAll(".menu [data-act]")) {
   item.addEventListener("click", () => {
     closeMenu();
     const act = item.dataset.act;
-    if (act === "new") askNewGame();
-    else if (act === "opp") { const n = Number(item.dataset.n); if (n !== settings.opponents) askNewGame(() => setOpponents(n)); }
+    if (act === "new") newGame();
+    else if (act === "stop") askStopGame();
+    else if (act === "games") showGames();
+    else if (act === "twoTabs") askTwoTabs();
+    else if (act === "online") askOnline();
+    else if (act === "invite") showInvites();
+    else if (act === "opp") { const n = Number(item.dataset.n); if (n !== game?.players.length - 1) setOpponents(n); }
     else if (act === "scores") showScores(null);
     else if (act === "options") showOptions();
     else if (act === "rules") dialog(t("rules"), t("rulesHtml"), [{label: t("ok"), default: true}], true);
@@ -1321,16 +1908,282 @@ addEventListener("keydown", e => {
     else if (myTurn() && ui.selected.size) { ui.selected.clear(); render(); }
     return;
   }
-  if (e.key === "F2") { e.preventDefault(); askNewGame(); return; }
+  if (e.key === "F2") { e.preventDefault(); newGame(); return; }
   if (e.key === "F1") { e.preventDefault(); dialog(t("rules"), t("rulesHtml"), [{label: t("ok"), default: true}], true); return; }
   if (onEscape || e.target.closest("input, button")) return;
   if (e.key === "Enter") finishTurn();
 });
 
 $("#go").addEventListener("click", finishTurn);
-$("#reset").addEventListener("click", () => { if (myTurn()) { undoTurn(); saveGame(); render(); } });
+$("#play-here").addEventListener("click", () => claimPlay(gameId, {steal: true}));
+$("#reset").addEventListener("click", () => { if (canAct()) { undoTurn(); saveGame(); render(); } });
 $("#sort-num").addEventListener("click", () => sortRack(false));
 $("#sort-color").addEventListener("click", () => sortRack(true));
+
+// --- playing online ----------------------------------------------------------------
+//
+// Through the multiplayer layer (../multiplayer/client.js): on a multiplayer server if one
+// serves this page, or else on Firebase. The state, turns, referee and computer players are
+// the same as in any other game: only the room is another one. Without the layer, such as
+// offline, none of this is offered.
+let layer = null, connection = null, serverThere = false;
+const loadLayer = async () => { layer ??= await import("../multiplayer/client.js"); return layer; };
+async function connectToLayer() {
+  const {connect} = await loadLayer();
+  connection ??= await connect({
+    game: "rummy",
+    scramble: true,
+    firebase: TEST && params.get("firebase") === "emulator" ? (params.has("unlisted") ? {emulator: true, listOnSignIn: false} : "emulator") : undefined,
+    realProject: !TEST,
+    sessionName: TEST && params.get("session") ? `multiplayer.test.${params.get("session")}` : undefined,
+    page: location.origin + location.pathname + (TEST ? "?test" : ""),
+  });
+  return connection;
+}
+async function lookForServer() {
+  try {
+    serverThere = await (await loadLayer()).available("..", {realProject: !TEST});
+  } catch {
+    serverThere = false;                // no layer here, such as offline
+  }
+  showMenuItems();
+}
+function showMenuItems() {
+  const online = Boolean(room?.online);
+  $('[data-act="online"]').hidden = !serverThere;
+  $('[data-act="invite"]').hidden = !online || !invitesOfThisRoom();
+  $('[data-act="stop"]').hidden = online;      // it would only stop it for you
+}
+
+// The online games this browser is in, to go back to them. Only a note of each: the game is on the server.
+function onlineGames() {
+  if (!KEEP) return [];
+  const found = [];
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(ROOM_PREFIX)) continue;
+      const note = JSON.parse(localStorage.getItem(key));
+      found.push({id: key.slice(ROOM_PREFIX.length), updated: note.updated ?? 0, players: note.players ?? 2});
+    }
+  } catch {}
+  return found.sort((a, b) => b.updated - a.updated);
+}
+function noteOnlineGame() {
+  if (!KEEP || !room?.online) return;
+  try { localStorage.setItem(ROOM_PREFIX + gameId, JSON.stringify({updated: Date.now(), players: room.seatCount})); } catch {}
+}
+function forgetOnlineGame(id) {
+  try {
+    localStorage.removeItem(ROOM_PREFIX + id);
+    localStorage.removeItem(INVITES_PREFIX + id);
+    for (let seat = 0; seat < 4; seat++) localStorage.removeItem(`${VIEW_PREFIX}${id}.${seat}`);
+    if (JSON.parse(localStorage.getItem(LAST_KEY))?.room === id) localStorage.removeItem(LAST_KEY);
+  } catch {}
+}
+
+function askOnline() {
+  const form = document.createElement("form");
+  const select = i => `<label class="field"><span>${t("playerN", i + 2)}</span> <select name="seat${i}">
+      <option value="person"${i === 0 ? " selected" : ""}>${t("seatPerson")}</option>
+      <option value="computer">${t("seatComputer")}</option>
+      <option value="none"${i === 0 ? "" : " selected"}>${t("seatNone")}</option></select></label>`;
+  form.innerHTML = `<p>${t("onlineNote")}</p><label class="field"><span>${t("yourName")}</span> <input name="name" maxlength="40" autocomplete="off"></label>
+    ${[0, 1, 2].map(select).join("")}<p class="note"></p>`;
+  const input = form.querySelector("input");
+  try { input.value = localStorage.getItem(STORE + "name") ?? ""; } catch {}
+  form.addEventListener("submit", e => e.preventDefault());
+  dialog(t("playOnline").replace("...", ""), form, [
+    {label: t("onlineCreate"), default: true, action: () => {
+      const data = new FormData(form), others = [0, 1, 2].map(i => data.get(`seat${i}`));
+      createOnline(input.value.trim() || t("playerN", 1), others.filter(kind => kind !== "none"));
+    }},
+    {label: t("cancel"), cancel: true},
+  ]);
+  input.focus();
+}
+
+async function createOnline(name, others, retried = false) {
+  if (!others.includes("person")) { message(t("onlineNeedsPerson")); return; }
+  if (KEEP) try { localStorage.setItem(STORE + "name", name); } catch {}
+  try {
+    const mp = await connectToLayer();
+    let computers = 0;
+    const players = [{human: true, name}, ...others.map(kind => kind === "person" ? {human: true} : {human: false, name: NAMES[computers++]})];
+    const state = dealGame(players, random).game;
+    const seats = players.map(p => p.human ? {kind: "person", ...(p.name ? {name: p.name} : {})} : {kind: "computer", name: p.name, level: settings.level});
+    const newRoom = await mp.create({seats, state, current: whoWrites(state)});
+    if (KEEP) try { localStorage.setItem(INVITES_PREFIX + newRoom.id, JSON.stringify(newRoom.inviteLinks)); } catch {}
+    enterRoom(newRoom, {push: true});
+    showInvites();
+  } catch (e) {
+    console.warn(e);
+    if (e.code === "secret-needed" && retried) message(t("creatorNotListed", (await connectToLayer()).uid?.() ?? ""));
+    else if (e.code === "secret-needed") askSecret(() => createOnline(name, others, true));
+    else message(t(e.code === "too-many-rooms" ? "tooManyRooms" : "onlineFailed"));
+  }
+}
+
+// A server with a secret only lets those who know it create games: asks once, and tries again.
+// On Firebase it takes a Google account on the list of creators instead.
+async function askSecret(retry) {
+  const mp = await connectToLayer();
+  if (mp.usesGoogle) {
+    dialog(t("secretTitle"), `<p data-google>${t("googleNote")}</p>`, [
+      {label: t("googleSignIn"), default: true, action: async () => {
+        try {
+          await mp.signIn();
+          retry();
+        } catch (e) {
+          console.warn(e);
+          message(t("onlineFailed"));
+        }
+      }},
+      {label: t("cancel"), cancel: true},
+    ]);
+    return;
+  }
+  const form = document.createElement("form");
+  form.innerHTML = `<p>${t("secretNote")}</p><label class="field"><span>${t("secretLabel")}</span> <input name="secret" type="password" autocomplete="off"></label>`;
+  form.addEventListener("submit", e => e.preventDefault());
+  const input = form.querySelector("input");
+  dialog(t("secretTitle"), form, [
+    {label: t("ok"), default: true, action: async () => {
+      try {
+        await (await connectToLayer()).signIn({secret: input.value});
+        retry();
+      } catch (e) {
+        console.warn(e);
+        message(t(e.code === "too-many-attempts" ? "secretTooMany" : e.code === "wrong-secret" ? "secretWrong" : "onlineFailed"));
+      }
+    }},
+    {label: t("cancel"), cancel: true},
+  ]);
+  input.focus();
+}
+
+function invitesOfThisRoom() {
+  if (!room?.online) return null;
+  if (record?.seats.every(seat => seat.kind !== "person" || seat.uid)) return null;     // everyone is in
+  if (Object.keys(room.inviteLinks ?? {}).length) return room.inviteLinks;
+  try { return JSON.parse(localStorage.getItem(INVITES_PREFIX + gameId)); } catch { return null; }
+}
+function showInvites() {
+  const links = invitesOfThisRoom();
+  if (!links) return;
+  const box = document.createElement("div");
+  const note = document.createElement("p");
+  note.textContent = t("inviteNote");
+  box.append(note);
+  for (const [seat, link] of Object.entries(links)) {
+    if (record?.seats[seat]?.uid) continue;      // the first record may still be on its way
+    const label = document.createElement("label");
+    label.className = "invite-row";
+    const title = document.createElement("span");
+    title.textContent = t("playerN", Number(seat) + 1);
+    const input = document.createElement("input");
+    input.className = "link";
+    input.readOnly = true;
+    input.value = link;
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "btn small";
+    copy.textContent = navigator.share ? t("shareLink") : t("copyLink");
+    copy.addEventListener("click", () => {
+      if (navigator.share) navigator.share({url: link}).catch(() => {});
+      else navigator.clipboard?.writeText(link).catch(() => {});
+      input.select();
+    });
+    label.append(title, input, copy);
+    box.append(label);
+  }
+  dialog(t("showInvite").replace("...", ""), box, [{label: t("close"), default: true}], true);
+}
+
+// Enters a room of the multiplayer server: from here on it is a game like any other.
+function enterRoom(newRoom, {push = false} = {}) {
+  closeGame();
+  gameId = newRoom.id;
+  room = newRoom;
+  mySeat = newRoom.mySeat;
+  ui.offline = false;
+  claimPlay(gameId, {wait: true});
+  const url = new URL(location.href);
+  url.searchParams.set("room", gameId);
+  url.searchParams.delete("game");
+  url.searchParams.delete("seat");
+  url.hash = "";
+  history[push ? "pushState" : "replaceState"](null, "", url);
+  const savedView = readView(gameId, mySeat);
+  let first = true;
+  stopWatching = room.watch(news => {
+    room.seatCount = news.seats.length;
+    if (first) noteOnlineGame();
+    receive(news, first ? savedView : undefined);
+    first = false;
+  });
+  room.onConnection = connected => { ui.offline = !connected; if (game) render(); };
+  room.onPresence = () => { if (game) { render(); followUp(); } };
+}
+
+// An address with a room in it: join with the key after the #, or go back to a room you are in.
+async function openOnline(id, push = false) {
+  const fallBack = key => {
+    forgetOnlineGame(id);
+    const url = new URL(location.href);
+    url.searchParams.delete("room");
+    url.hash = "";
+    history.replaceState(null, "", url);
+    if (game) closeGame();
+    gameId = null;
+    room = null;
+    newGame();
+    message(t(key));
+  };
+  try {
+    const client = await loadLayer();
+    const mp = await connectToLayer();
+    const invite = client.parseInvite(location.href);
+    if (!invite || invite.room !== id) { enterRoom(await mp.open(id), {push}); return; }
+    const preview = await mp.preview(location.href);
+    if (preview.joined) {
+      enterRoom(await mp.open(id));
+      // A session belongs to a browser: this is someone else's invitation, opened by a player.
+      if (preview.seat !== invite.seat) message(t("inviteIsYours"));
+      return;
+    }
+    const form = document.createElement("form");
+    const host = preview.seats.find(seat => seat.taken)?.name ?? t("opponent");
+    form.innerHTML = `<p></p><label class="field"><span>${t("yourName")}</span> <input name="name" maxlength="40" autocomplete="off"></label>`;
+    form.querySelector("p").textContent = t("joinNote", host, preview.seats.length);
+    const input = form.querySelector("input");
+    try { input.value = localStorage.getItem(STORE + "name") ?? ""; } catch {}
+    form.addEventListener("submit", e => e.preventDefault());
+    dialog("Tile Rummy", form, [
+      {label: t("onlineJoin"), default: true, action: async () => {
+        const name = input.value.trim() || t("opponent");
+        if (KEEP) try { localStorage.setItem(STORE + "name", name); } catch {}
+        try {
+          enterRoom(await mp.join(location.href, {name}));
+        } catch (e) {
+          console.warn(e);
+          fallBack(e.code === "seat-taken" ? "seatTaken" : "inviteNotValid");
+        }
+      }},
+      {label: t("cancel"), cancel: true, action: () => fallBack("inviteDeclined")},
+    ]);
+    input.focus();
+  } catch (e) {
+    console.warn(e);
+    fallBack(e.code === "no-such-room" ? "roomGone" : e.code === "not-a-member" || e.code === "secret-needed" ? "notInRoom"
+      : e.code === "seat-taken" ? "seatTaken" : e.code === "wrong-key" ? "inviteNotValid" : "onlineFailed");
+  }
+}
+
+// While someone else plays, the tab's title says when it is your turn.
+function setTitle(hidden = document.hidden) {
+  document.title = room?.online && myTurn() && hidden ? `● ${t("yourTurnShort")} · Tile Rummy` : "Tile Rummy";
+}
+addEventListener("visibilitychange", () => setTitle());
 
 // --- language --------------------------------------------------------------------
 
@@ -1340,12 +2193,67 @@ function setLanguage(name) {
   document.documentElement.lang = name;
   for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t);
   for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
-  if (game) { game.players[0].name = t("you"); render(); }
+  if (game) render();
 }
 for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLanguage(b.dataset.lang));
 
+// For the tests: makes this state the game's, as if it had come from a turn.
+function testPosition(state) {
+  const news = room.adopt({...record, state, current: whoWrites(state), turn: record.turn + 1, restarted: true});
+  saveRecord(news);
+  receive(news);
+}
+
+// Another tab changed this game, as another player or the same one: follow it.
+addEventListener("storage", e => {
+  if (!gameId || e.key !== GAME_PREFIX + gameId) return;
+  if (e.newValue === null) {               // stopped or deleted in another tab
+    leaveGame();
+    showNoGame("gameStoppedElsewhere");
+    return;
+  }
+  // Not readGame, which turns down a game that doesn't add up: here the referee
+  // should see it, and say so.
+  let news = null;
+  try { news = JSON.parse(localStorage.getItem(GAME_PREFIX + gameId))?.record; } catch {}
+  if (Number.isInteger(news?.turn) && (!record || news.turn >= record.turn)) receive(room.adopt(news));
+});
+
+// The back and forward buttons go between games.
+addEventListener("popstate", () => {
+  const address = new URLSearchParams(location.search), id = address.get("game"), seat = seatFromAddress(address);
+  if (address.get("room")) { if (address.get("room") !== gameId) openOnline(address.get("room")); return; }
+  if ((id !== gameId || seat !== mySeat) && !openKeptGame(id, {seat})) {
+    closeGame();
+    gameId = null;
+    showUnknownGame();
+  }
+});
+
 setLanguage(lang);
-if (!resumeGame()) newGame(true);
+forgetOldGames();
+forgetLeftovers();
+{
+  // An id in the address is that game. Without one: the game played last, unless the
+  // address asks for another number of opponents. Otherwise, a new game.
+  const wanted = params.get("game"), wantedRoom = params.get("room");
+  let last = null;
+  try { last = KEEP ? JSON.parse(localStorage.getItem(LAST_KEY)) : null; } catch {}
+  const opponents = params.has("opponents") ? settings.opponents : null;
+  const lastFits = () => opponents === null || readGame(last.id)?.record.state.players.length === opponents + 1;
+  if (wantedRoom) {
+    openOnline(wantedRoom);
+  } else if (last?.room && opponents === null) {
+    openOnline(last.room);
+  } else if (wanted) {
+    if (!openKeptGame(wanted, {seat: mySeat})) showUnknownGame();
+  } else if (!(last?.id && lastFits() && openKeptGame(last.id, {seat: last.seat ?? 0}))) {
+    newGame();
+  }
+}
+
+tidyGames();
+if (location.protocol.startsWith("http")) lookForServer();
 
 if (!TEST && "serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(e => console.warn(e));

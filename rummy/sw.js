@@ -6,8 +6,8 @@
 // when the list of PAGE files changes.
 "use strict";
 
-const PAGE_CACHE = "rummy-page-2";
-const PAGE = ["./", "index.html", "rules.js", "worker.js", "solver.wasm", "manifest.webmanifest", "icon.svg",
+const PAGE_CACHE = "rummy-page-3";
+const PAGE = ["./", "index.html", "rules.js", "room.js", "worker.js", "solver.wasm", "manifest.webmanifest", "icon.svg",
               "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"];
 
 self.addEventListener("install", event => {
