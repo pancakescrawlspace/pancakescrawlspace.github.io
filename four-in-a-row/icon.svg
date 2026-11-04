@@ -1,22 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#f7f6f2"/>
+  <rect width="512" height="512" rx="112" fill="#007a1f"/>
   <g transform="translate(76 76)">
-    <rect width="360" height="360" rx="22" fill="#dedbd3"/>
-    <circle cx="45" cy="315" r="35.1" fill="#e27500"/>
-    <circle cx="45" cy="225" r="35.1" fill="#f7f6f2"/>
-    <circle cx="45" cy="135" r="35.1" fill="#f7f6f2"/>
-    <circle cx="45" cy="45" r="35.1" fill="#f7f6f2"/>
-    <circle cx="135" cy="315" r="35.1" fill="#1646b8"/>
-    <circle cx="135" cy="225" r="35.1" fill="#e27500"/>
-    <circle cx="135" cy="135" r="35.1" fill="#f7f6f2"/>
-    <circle cx="135" cy="45" r="35.1" fill="#f7f6f2"/>
-    <circle cx="225" cy="315" r="35.1" fill="#1646b8"/>
-    <circle cx="225" cy="225" r="35.1" fill="#1646b8"/>
-    <circle cx="225" cy="135" r="35.1" fill="#e27500"/>
-    <circle cx="225" cy="45" r="35.1" fill="#f7f6f2"/>
-    <circle cx="315" cy="315" r="35.1" fill="#f7f6f2"/>
-    <circle cx="315" cy="225" r="35.1" fill="#1646b8"/>
-    <circle cx="315" cy="135" r="35.1" fill="#f7f6f2"/>
-    <circle cx="315" cy="45" r="35.1" fill="#e27500"/>
+    <rect width="360" height="360" rx="22" fill="#1646b8"/>
+    <circle cx="45" cy="315" r="35.1" fill="#d81e28"/>
+    <circle cx="45" cy="225" r="35.1" fill="#007a1f"/>
+    <circle cx="45" cy="135" r="35.1" fill="#007a1f"/>
+    <circle cx="45" cy="45" r="35.1" fill="#007a1f"/>
+    <circle cx="135" cy="315" r="35.1" fill="#f7c815"/>
+    <circle cx="135" cy="225" r="35.1" fill="#d81e28"/>
+    <circle cx="135" cy="135" r="35.1" fill="#007a1f"/>
+    <circle cx="135" cy="45" r="35.1" fill="#007a1f"/>
+    <circle cx="225" cy="315" r="35.1" fill="#f7c815"/>
+    <circle cx="225" cy="225" r="35.1" fill="#f7c815"/>
+    <circle cx="225" cy="135" r="35.1" fill="#d81e28"/>
+    <circle cx="225" cy="45" r="35.1" fill="#007a1f"/>
+    <circle cx="315" cy="315" r="35.1" fill="#007a1f"/>
+    <circle cx="315" cy="225" r="35.1" fill="#f7c815"/>
+    <circle cx="315" cy="135" r="35.1" fill="#007a1f"/>
+    <circle cx="315" cy="45" r="35.1" fill="#d81e28"/>
   </g>
 </svg>

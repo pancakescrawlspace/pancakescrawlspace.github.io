@@ -1,23 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- Full-bleed, with the board inside the middle 80% that every system's mask keeps. -->
-  <rect width="512" height="512" fill="#f7f6f2"/>
+  <rect width="512" height="512" fill="#007a1f"/>
   <g transform="translate(106 106)">
-    <rect width="300" height="300" rx="18" fill="#dedbd3"/>
-    <circle cx="37.5" cy="262.5" r="29.25" fill="#e27500"/>
-    <circle cx="37.5" cy="187.5" r="29.25" fill="#f7f6f2"/>
-    <circle cx="37.5" cy="112.5" r="29.25" fill="#f7f6f2"/>
-    <circle cx="37.5" cy="37.5" r="29.25" fill="#f7f6f2"/>
-    <circle cx="112.5" cy="262.5" r="29.25" fill="#1646b8"/>
-    <circle cx="112.5" cy="187.5" r="29.25" fill="#e27500"/>
-    <circle cx="112.5" cy="112.5" r="29.25" fill="#f7f6f2"/>
-    <circle cx="112.5" cy="37.5" r="29.25" fill="#f7f6f2"/>
-    <circle cx="187.5" cy="262.5" r="29.25" fill="#1646b8"/>
-    <circle cx="187.5" cy="187.5" r="29.25" fill="#1646b8"/>
-    <circle cx="187.5" cy="112.5" r="29.25" fill="#e27500"/>
-    <circle cx="187.5" cy="37.5" r="29.25" fill="#f7f6f2"/>
-    <circle cx="262.5" cy="262.5" r="29.25" fill="#f7f6f2"/>
-    <circle cx="262.5" cy="187.5" r="29.25" fill="#1646b8"/>
-    <circle cx="262.5" cy="112.5" r="29.25" fill="#f7f6f2"/>
-    <circle cx="262.5" cy="37.5" r="29.25" fill="#e27500"/>
+    <rect width="300" height="300" rx="18" fill="#1646b8"/>
+    <circle cx="37.5" cy="262.5" r="29.25" fill="#d81e28"/>
+    <circle cx="37.5" cy="187.5" r="29.25" fill="#007a1f"/>
+    <circle cx="37.5" cy="112.5" r="29.25" fill="#007a1f"/>
+    <circle cx="37.5" cy="37.5" r="29.25" fill="#007a1f"/>
+    <circle cx="112.5" cy="262.5" r="29.25" fill="#f7c815"/>
+    <circle cx="112.5" cy="187.5" r="29.25" fill="#d81e28"/>
+    <circle cx="112.5" cy="112.5" r="29.25" fill="#007a1f"/>
+    <circle cx="112.5" cy="37.5" r="29.25" fill="#007a1f"/>
+    <circle cx="187.5" cy="262.5" r="29.25" fill="#f7c815"/>
+    <circle cx="187.5" cy="187.5" r="29.25" fill="#f7c815"/>
+    <circle cx="187.5" cy="112.5" r="29.25" fill="#d81e28"/>
+    <circle cx="187.5" cy="37.5" r="29.25" fill="#007a1f"/>
+    <circle cx="262.5" cy="262.5" r="29.25" fill="#007a1f"/>
+    <circle cx="262.5" cy="187.5" r="29.25" fill="#f7c815"/>
+    <circle cx="262.5" cy="112.5" r="29.25" fill="#007a1f"/>
+    <circle cx="262.5" cy="37.5" r="29.25" fill="#d81e28"/>
   </g>
 </svg>

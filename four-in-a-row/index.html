@@ -11,8 +11,9 @@
 <meta name="theme-color" content="#f7f6f2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
 <style>
-  /* Plain and flat, in the colours of the other pages, with a plate that the
-     discs fall behind. The discs keep their orange and blue. */
+  /* Plain and flat, in the colours of the other pages, around a green table like
+     Tile Rummy's: a blue board, with red and yellow discs that fall behind its
+     plate. The table and the board look the same in light and dark mode. */
   :root {
     --bg: #f7f6f2;            /* the same plain colours as the solfège and piano pages */
     --panel: #ffffff;
@@ -25,9 +26,16 @@
     --yes: #23753a;
     --no: #b3372f;
     --no-soft: #f8e0dd;
-    --plate: #dedbd3;
-    --seat0: #e27500;         /* orange and blue: easy to tell apart, also for people who don't see red and green */
-    --seat1: #1646b8;
+    --table: #007a1f;         /* the same as Tile Rummy's */
+    --on-table: #ffffff;
+    --on-table-soft: rgba(255, 255, 255, .82);
+    --plate: #1646b8;
+    --seat0: #d81e28;
+    --seat1: #f7c815;
+    --mark0: #fff;            /* the dot and ring on a disc */
+    --mark1: rgba(0, 0, 0, .65);
+    --over-plate: rgba(255, 255, 255, .14);
+    --focus-plate: var(--on-table);
     /* The width of a cell: seven across, and six down plus the row above the
        board, inside what the menu, the players and the button leave free. */
     --c: clamp(30px, min((100vw - 16px) / 7, (100dvh - 200px) / 7), 84px);
@@ -45,8 +53,20 @@
       --yes: #6fcf87;
       --no: #f08a80;
       --no-soft: #43231f;
-      --plate: #4a4741;
     }
+  }
+  /* The other colours in the options. For people who don't see red and green, a red disc
+     looks much like an empty green hole. Orange and blue stay apart for all the usual kinds
+     of colour blindness, also in brightness, and the table and board are nearly colourless. */
+  :root[data-colours="clear"] {
+    --table: #2b2f36;
+    --plate: #e4e4e0;
+    --seat0: #e69f00;
+    --seat1: #0072b2;
+    --mark0: rgba(0, 0, 0, .7);
+    --mark1: #fff;
+    --over-plate: rgba(0, 0, 0, .1);
+    --focus-plate: #111;
   }
   /* Too low for the players above and the button below: they go beside the board. */
   @media (max-height: 460px) and (min-width: 480px) {
@@ -67,22 +87,22 @@
   [hidden] { display: none !important; }
 
   /* --- the page around the game --- */
-  .app { display: flex; flex-direction: column; margin: auto; }
-  .topbar { position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 8px; user-select: none; }
-  #menu-button { display: grid; place-items: center; flex: none; width: 34px; height: 30px; padding: 0; border: none; border-radius: 6px; background: none; cursor: pointer; }
+  .app { position: relative; display: flex; flex-direction: column; margin: auto; }
+  /* No bar: two small patches in the page's colour, on the corners of the table. */
+  .topbar { position: absolute; z-index: 20; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 4px; pointer-events: none; user-select: none; }
+  .topbar > button, .topbar > .lang, .topbar > .menu { pointer-events: auto; }
+  #menu-button { display: grid; place-items: center; flex: none; width: 34px; height: 30px; padding: 0; border: none; border-radius: 6px; background: var(--bg); cursor: pointer; }
   #menu-button svg { width: 18px; height: 18px; }
   #menu-button:hover, #menu-button[aria-expanded=true] { background: var(--accent-soft); }
   #menu-button:focus-visible { outline: 2px solid var(--accent); }
-  .brand { min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .topbar .spacer { flex: 1; }
-  .topbar .lang { display: flex; flex: none; gap: 2px; }
+  .topbar .lang { display: flex; flex: none; align-items: center; gap: 2px; height: 30px; padding: 0 3px; border-radius: 6px; background: var(--bg); }
   .topbar .lang button { padding: 2px 6px; border: none; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
   .topbar .lang button[aria-pressed=true] { background: var(--accent-soft); color: var(--text); }
   .menu {
     position: absolute;
     z-index: 30;
     top: 100%;
-    left: 8px;
+    left: 4px;
     min-width: 190px;
     padding: 4px;
     border: 1px solid var(--line);
@@ -123,7 +143,7 @@
   .statusbar { display: flex; gap: 12px; padding: 5px 8px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
   .statusbar > div { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #status { flex: 1; }
-  .app { width: min(760px, 100vw); height: min(820px, 100dvh); }
+  .app { width: 100vw; height: 100dvh; }
 
   /* --- the table --- */
   .tabletop {
@@ -135,7 +155,8 @@
     justify-content: center;
     gap: 6px;
     padding: 6px;
-    border-top: 1px solid var(--line);
+    background: var(--table);
+    color: var(--on-table);
     overflow: hidden;
   }
   .players {
@@ -149,11 +170,11 @@
   .who .name { padding: 0 6px; border-radius: 6px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .who.active .name { background: var(--accent); color: var(--accent-text); }
   .who .wins { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .chip { flex: none; width: 14px; height: 14px; border-radius: 50%; }
-  .s0 { background-color: var(--seat0); }
-  .s1 { background-color: var(--seat1); }
+  .chip { flex: none; width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--on-table); }
+  .s0 { background-color: var(--seat0); --mark: var(--mark0); }
+  .s1 { background-color: var(--seat1); --mark: var(--mark1); }
 
-  #said { min-height: 1.4em; color: var(--muted); text-align: center; }
+  #said { min-height: 1.4em; color: var(--on-table-soft); text-align: center; }
 
   /* The board, from back to front: the discs, the plate with round holes cut out
      of it, and over it all a button per column. Its top row, without a plate,
@@ -189,16 +210,16 @@
     from { transform: translateY(calc(var(--fall) * var(--c) * -1)); }
     to { transform: none; }
   }
-  /* The last move has a small mark; the winning line a white ring. */
+  /* The last move has a small mark; the winning line a ring. */
   .disc.last::after {
     content: "";
     position: absolute;
     inset: 38%;
     border-radius: 50%;
-    background: rgba(255, 255, 255, .9);
+    background: var(--mark);
   }
-  #board.won .disc:not(.win) { opacity: .55; }
-  .disc.win { box-shadow: inset 0 0 0 calc(var(--c) * .07) #fff; }
+  #board.won .disc:not(.win) { opacity: .7; }
+  .disc.win { box-shadow: inset 0 0 0 calc(var(--c) * .07) var(--mark); }
   #cols { position: absolute; inset: 0; display: flex; }
   .col {
     position: relative;
@@ -221,10 +242,10 @@
   }
   #board.myturn .col[aria-disabled=false] { cursor: pointer; }
   @media (hover: hover) {
-    #board.myturn .col[aria-disabled=false]:hover { background: rgba(127, 127, 127, .12); }
+    #board.myturn .col[aria-disabled=false]:hover { background: var(--over-plate); }
     #board.myturn .col[aria-disabled=false]:hover .hint { opacity: .6; }
   }
-  #board.myturn .col[aria-disabled=false]:focus-visible { background: rgba(127, 127, 127, .12); outline: 2px solid var(--accent); outline-offset: -2px; }
+  #board.myturn .col[aria-disabled=false]:focus-visible { background: var(--over-plate); outline: 2px solid var(--focus-plate); outline-offset: -2px; }
   #board.myturn .col[aria-disabled=false]:focus-visible .hint { opacity: .6; }
 
   /* The players and their message above the board, and the button below it;
@@ -268,6 +289,11 @@
   .field { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
   .field input, input.link { flex: 1; width: 100%; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
   .dialog .buttons { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 12px 12px; }
+  .game-row { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .game-row:first-child { border-top: none; }
+  .game-about { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .game-when { color: var(--muted); font-size: 12px; }
+  .btn.small { min-width: 0; padding: 3px 8px; }
   fieldset { margin: 0 0 10px; padding: 6px 10px 8px; border: 1px solid var(--line); border-radius: 8px; }
   legend { padding: 0 4px; color: var(--muted); }
   fieldset label { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
@@ -280,8 +306,6 @@
     <button type="button" id="menu-button" aria-label="Menu" title="Menu" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">
       <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 4.5h14M2 9h14M2 13.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
     </button>
-    <span class="brand" data-t="title"></span>
-    <span class="spacer"></span>
     <span class="lang" role="group" aria-label="Taal / Language">
       <button type="button" data-lang="nl" lang="nl" title="Nederlands">NL</button>
       <button type="button" data-lang="en" lang="en" title="English">EN</button>
@@ -290,7 +314,8 @@
       <button type="button" role="menuitem" data-act="new"><span data-t="newGame"></span><span>F2</span></button>
       <button type="button" role="menuitem" data-act="clear"><span data-t="clearScore"></span></button>
       <button type="button" role="menuitem" data-act="online" hidden><span data-t="playOnline"></span></button>
-      <button type="button" role="menuitem" data-act="invite" hidden><span data-t="showInvite"></span></button>
+      <button type="button" role="menuitem" data-act="invite" hidden><span data-t="copyGameLink"></span></button>
+      <button type="button" role="menuitem" data-act="games" hidden><span data-t="games"></span></button>
       <button type="button" role="menuitem" data-act="own" hidden><span data-t="ownGame"></span></button>
       <hr>
       <button type="button" role="menuitem" data-act="options"><span data-t="options"></span></button>
@@ -356,7 +381,7 @@ const RULES_NL = `
 <li>Met het toetsenbord: de cijfers 1 tot en met 7 kiezen een kolom; of ga met de pijltjes naar een kolom en druk op Enter.</li>
 <li>De laatste zet heeft een stipje in de schijf.</li>
 </ul>
-<p>In <i>Menu → Opties</i> kies je hoe sterk de computer speelt en wie er begint. Oranje is altijd jij, blauw de computer. In een online spel heeft ieder een eigen kleur, naast zijn naam.</p>`;
+<p>In <i>Menu → Opties</i> kies je hoe sterk de computer speelt en wie er begint. Daar kies je ook de kleuren, met een keuze die geschikt is voor kleurenblinden. Ieders kleur staat naast zijn naam.</p>`;
 
 const RULES_EN = `
 <p>Take turns dropping a disc into a column; it falls to the lowest free cell. The first player with four of their discs in a row wins: across, up or diagonally. If the board fills up without four in a row, it is a draw.</p>
@@ -366,7 +391,7 @@ const RULES_EN = `
 <li>With the keyboard: the digits 1 to 7 choose a column; or go to a column with the arrow keys and press Enter.</li>
 <li>The last move has a dot in its disc.</li>
 </ul>
-<p>In <i>Menu → Options</i> you choose how strongly the computer plays and who starts. Orange is always you, and blue the computer. In an online game each player has a colour, next to their name.</p>`;
+<p>In <i>Menu → Options</i> you choose how strongly the computer plays and who starts. You can also choose the colours there, with a choice suited to colour blindness. Each player's colour is next to their name.</p>`;
 
 const STRINGS = {
   nl: {
@@ -380,9 +405,15 @@ const STRINGS = {
     playOnline: "Online spelen...", showInvite: "Uitnodiging...", ownGame: "Terug naar je eigen spel", yourName: "Je naam",
     onlineNote: "Je maakt een spel aan en krijgt een link voor je tegenstander.", onlineCreate: "Aanmaken", onlineJoin: "Meedoen",
     onlineFailed: "Dat lukte niet: de multiplayer-server reageert niet goed.",
+    copyGameLink: "Spellink kopiëren", linkToCopy: "Spellink",
+    linkCopied: "De link is gekopieerd. Stuur hem naar je tegenstander. Wie hem als eerste opent, krijgt de plaats.",
+    linkCopiedJoined: "De link is gekopieerd. Wie al meedoet, komt er weer mee in dit spel, in dezelfde browser. Op een ander apparaat werkt dat niet.",
+    linkNotCopied: "Kopieer deze link. Wie al meedoet, komt er weer mee in dit spel, in dezelfde browser. Wie nog niet meedoet en hem als eerste opent, krijgt de plaats.",
     inviteNote: "Stuur deze link naar je tegenstander. Wie hem als eerste opent, krijgt de plaats.", copyLink: "Kopiëren",
     joinNote: host => `${host} nodigt je uit voor een spel.`, waitingToJoin: "Wachten tot je tegenstander meedoet...",
-    offline: "De verbinding is weg; er wordt opnieuw geprobeerd...",
+    offline: "De verbinding is weg; er wordt opnieuw geprobeerd...", seatInvited: "uitgenodigd", seatAway: "afwezig", yourTurnShort: "Jouw beurt",
+    games: "Mijn online spellen...", gameAgainst: name => `Tegen ${name}`, gameInvited: "Tegenstander uitgenodigd", gameOpen: "Openen", gameForget: "Vergeten",
+    gamesNote: "Vergeten haalt een spel alleen uit deze lijst.",
     inviteIsYours: "Deze uitnodiging is voor je tegenstander, en deze browser is al jouw kant van het spel. Om het op één computer uit te proberen: open de link in een andere browser of een privévenster.",
     seatTaken: "Deze uitnodiging is al gebruikt.", inviteNotValid: "Deze uitnodiging klopt niet.",
     roomGone: "Dit spel bestaat niet meer.", notInRoom: "Je doet niet mee aan dit spel. Vraag om een uitnodiging.",
@@ -392,6 +423,7 @@ const STRINGS = {
     level: "Niveau", easy: "Makkelijk", medium: "Gemiddeld", hard: "Moeilijk",
     levelNote: "Een nieuw niveau geldt vanaf de volgende zet.",
     starts: "Wie begint", startsTurns: "Om de beurt", startsYou: "Altijd jij", startsComputer: "Altijd de computer", language: "Taal",
+    colours: "Kleuren", coloursClassic: "Rood en geel", coloursClear: "Oranje en blauw, voor kleurenblinden",
     draws: n => `Gelijk: ${n}`, column: n => `Kolom ${n}`, columnFull: n => `Kolom ${n} (vol)`,
     giveUp: "Dit spel stoppen en een nieuw beginnen? Het telt niet mee voor de score.",
     refused: "Die zet klopt niet met de regels van het spel, of kwam op het verkeerde moment.",
@@ -410,9 +442,15 @@ const STRINGS = {
     playOnline: "Play online...", showInvite: "Invitation...", ownGame: "Back to your own game", yourName: "Your name",
     onlineNote: "You create a game, and get a link for your opponent.", onlineCreate: "Create", onlineJoin: "Join",
     onlineFailed: "That didn't work: the multiplayer server isn't answering properly.",
+    copyGameLink: "Copy game link", linkToCopy: "Game link",
+    linkCopied: "The link is copied. Send it to your opponent. Whoever opens it first gets the seat.",
+    linkCopiedJoined: "The link is copied. Anyone already in the game gets back in with it, in the same browser. It doesn't work on another device.",
+    linkNotCopied: "Copy this link. Anyone already in the game gets back in with it, in the same browser. If a seat is still open, whoever opens it first gets that seat.",
     inviteNote: "Send this link to your opponent. Whoever opens it first gets the seat.", copyLink: "Copy",
     joinNote: host => `${host} invites you to a game.`, waitingToJoin: "Waiting for your opponent to join...",
-    offline: "The connection is gone; trying again...",
+    offline: "The connection is gone; trying again...", seatInvited: "invited", seatAway: "away", yourTurnShort: "Your turn",
+    games: "My online games...", gameAgainst: name => `Against ${name}`, gameInvited: "Opponent invited", gameOpen: "Open", gameForget: "Forget",
+    gamesNote: "Forgetting only removes a game from this list.",
     inviteIsYours: "This invitation is for your opponent, and this browser is already your side of the game. To try it on one computer, open the link in another browser or a private window.",
     seatTaken: "This invitation has already been used.", inviteNotValid: "This invitation isn't valid.",
     roomGone: "This game no longer exists.", notInRoom: "You aren't in this game. Ask for an invitation.",
@@ -422,6 +460,7 @@ const STRINGS = {
     level: "Level", easy: "Easy", medium: "Medium", hard: "Hard",
     levelNote: "A new level applies from the next move on.",
     starts: "Who starts", startsTurns: "Taking turns", startsYou: "Always you", startsComputer: "Always the computer", language: "Language",
+    colours: "Colours", coloursClassic: "Red and yellow", coloursClear: "Orange and blue, for colour blindness",
     draws: n => `Draws: ${n}`, column: n => `Column ${n}`, columnFull: n => `Column ${n} (full)`,
     giveUp: "Stop this game and start a new one? It won't count for the score.",
     refused: "That move doesn't fit the rules of the game, or came at the wrong moment.",
@@ -442,10 +481,13 @@ const t = (key, ...args) => {
 
 // --- settings ----------------------------------------------------------------
 
-const settings = {level: "medium", starts: "turns"};
+const settings = {level: "medium", starts: "turns", colours: "classic"};
 if (KEEP) try { Object.assign(settings, JSON.parse(localStorage.getItem(STORE + "settings")) ?? {}); } catch {}
 if (!["easy", "medium", "hard"].includes(settings.level)) settings.level = "medium";
 if (!["turns", "you", "computer"].includes(settings.starts)) settings.starts = "turns";
+if (!["classic", "clear"].includes(settings.colours)) settings.colours = "classic";
+const showColours = () => { document.documentElement.dataset.colours = settings.colours; };
+showColours();
 const saveSettings = () => { if (KEEP) try { localStorage.setItem(STORE + "settings", JSON.stringify(settings)); } catch {} };
 
 // --- the computer's moves ----------------------------------------------------
@@ -512,6 +554,7 @@ function enterRoom(newRoom) {
   $("#discs").replaceChildren();
   stopWatching = room.watch(receive);
   room.onConnection = connected => { ui.offline = !connected; render(); };
+  room.onPresence = () => render();
   showMenuItems();
 }
 function startOwnGame() {
@@ -534,6 +577,7 @@ function receive(news) {
     if (checkTurn(before.state, news.state, before.current)) message(t("refused"));
   }
   record = news;
+  noteOnlineGame();
   render();
   followUp();
 }
@@ -671,7 +715,10 @@ function render() {
   for (const seat of [0, 1]) {
     const el = $(`#seat-${seat}`);
     el.classList.toggle("active", !over && record.current === seat);
-    el.querySelector(".name").textContent = seatName(seat);
+    const seatInfo = record.seats[seat];
+    const invited = room.online && seatInfo.kind === "person" && !seatInfo.uid;
+    const away = room.online && !invited && !ui.offline && seat !== room.mySeat && room.present && !room.present.includes(seat);
+    el.querySelector(".name").textContent = invited ? `${seatName(seat)} · ${t("seatInvited")}` : away ? `${seatName(seat)} · ${t("seatAway")}` : seatName(seat);
     el.querySelector(".wins").textContent = state.wins[seat];
   }
 
@@ -692,6 +739,7 @@ function render() {
   $("#level").textContent = levels.length ? `${t("level")}: ${t(levels[0])}` : "";
   $("#level").hidden = !levels.length;
   $("#draws").textContent = t("draws", state.draws);
+  setTitle();
 
   const again = $("#again");
   const wasFocus = over && !again.classList.contains("default");
@@ -752,6 +800,9 @@ function showOptions() {
       ${radio("starts", "turns", t("startsTurns"), settings.starts === "turns")}
       ${radio("starts", "you", t("startsYou"), settings.starts === "you")}
       ${radio("starts", "computer", t("startsComputer"), settings.starts === "computer")}</fieldset>
+    <fieldset><legend>${t("colours")}</legend>
+      ${radio("colours", "classic", t("coloursClassic"), settings.colours === "classic")}
+      ${radio("colours", "clear", t("coloursClear"), settings.colours === "clear")}</fieldset>
     <fieldset><legend>${t("language")}</legend>
       ${radio("lang", "nl", "Nederlands", lang === "nl")}${radio("lang", "en", "English", lang === "en")}</fieldset>`;
   dialog(t("options").replace("...", ""), form, [
@@ -759,7 +810,9 @@ function showOptions() {
       const data = new FormData(form);
       settings.level = data.get("level");
       settings.starts = data.get("starts");
+      settings.colours = data.get("colours");
       saveSettings();
+      showColours();
       record.seats.forEach((seat, i) => {
         if (seat.kind === "computer" && seat.level !== settings.level) room.setSeat(i, {...seat, level: settings.level});
       });
@@ -795,7 +848,8 @@ for (const item of document.querySelectorAll(".menu button")) {
     if (act === "new") askNewGame();
     else if (act === "clear") room.restart({state: {...record.state, wins: [0, 0], draws: 0}, current: record.current});
     else if (act === "online") askOnline();
-    else if (act === "invite") showInvite();
+    else if (act === "invite") copyGameLink();
+    else if (act === "games") showGames();
     else if (act === "own") location.href = location.pathname + (TEST ? "?test" : "");
     else if (act === "options") showOptions();
     else if (act === "rules") showRules();
@@ -853,10 +907,92 @@ function showMenuItems() {
   $('[data-act="online"]').hidden = !serverThere || online;
   $('[data-act="own"]').hidden = !online;
   $('[data-act="clear"]').hidden = online;
-  $('[data-act="invite"]').hidden = !online || !inviteOfThisRoom();
+  $('[data-act="invite"]').hidden = !online;
+  $('[data-act="games"]').hidden = !serverThere || !otherOnlineGames().length;
+}
+
+// The online games this browser is in, to go back to them from the menu. Only a note of
+// each, since the game itself is on the server, and only the latest ones.
+const ONLINE_KEY = STORE + "online", MOST_ONLINE_GAMES = 20;
+function onlineGames() {
+  if (!KEEP) return [];
+  try {
+    return Object.entries(JSON.parse(localStorage.getItem(ONLINE_KEY)) ?? {}).map(([id, note]) => ({id, ...note})).sort((a, b) => b.updated - a.updated);
+  } catch {
+    return [];
+  }
+}
+const otherOnlineGames = () => onlineGames().filter(({id}) => id !== room?.id);
+function saveOnlineGames(games) {
+  try { localStorage.setItem(ONLINE_KEY, JSON.stringify(Object.fromEntries(games.map(({id, ...note}) => [id, note])))); } catch {}
+}
+function noteOnlineGame() {
+  if (!KEEP || !room?.online) return;
+  const other = record.seats[1 - room.mySeat];
+  const games = [{id: room.id, updated: Date.now(), joined: Boolean(other.uid), opponent: other.name ?? null}, ...otherOnlineGames()];
+  saveOnlineGames(games.slice(0, MOST_ONLINE_GAMES));
+  for (const {id} of games.slice(MOST_ONLINE_GAMES)) try { localStorage.removeItem(inviteKey(id)); } catch {}
+  showMenuItems();
+}
+function forgetOnlineGame(id) {
+  saveOnlineGames(onlineGames().filter(game => game.id !== id));
+  try { localStorage.removeItem(inviteKey(id)); } catch {}
+}
+function showGames() {
+  const games = otherOnlineGames();
+  showMenuItems();
+  if (!games.length) { closeDialog(); return; }
+  const box = document.createElement("div");
+  for (const {id, updated, joined, opponent} of games) {
+    const row = document.createElement("div");
+    row.className = "game-row";
+    const about = document.createElement("div");
+    about.className = "game-about";
+    about.textContent = joined ? t("gameAgainst", opponent ?? t("opponent")) : t("gameInvited");
+    const when = document.createElement("div");
+    when.className = "game-when";
+    when.textContent = new Date(updated).toLocaleString(lang, {dateStyle: "medium", timeStyle: "short"});
+    about.append(when);
+    const button = (key, action) => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "btn small";
+      el.textContent = t(key);
+      el.addEventListener("click", action);
+      return el;
+    };
+    row.append(about, button("gameOpen", () => { location.href = addressFor(id); }),
+               button("gameForget", () => { forgetOnlineGame(id); showGames(); }));
+    box.append(row);
+  }
+  const note = document.createElement("p");
+  note.className = "game-when";
+  note.textContent = t("gamesNote");
+  box.append(note);
+  dialog(t("games").replace("...", ""), box, [{label: t("close"), default: true, cancel: true}]);
 }
 function inviteOfThisRoom() {
   try { return room?.inviteLinks?.[1] ?? localStorage.getItem(inviteKey(room?.id)); } catch { return room?.inviteLinks?.[1] ?? null; }
+}
+
+// The link to send again: the invitation if this browser made it, or else the room's address.
+async function copyGameLink() {
+  const link = inviteOfThisRoom() ?? addressFor(room.id).href;
+  const open = !record?.seats[1 - room.mySeat].uid;
+  try {
+    await navigator.clipboard.writeText(link);
+    message(t(open && inviteOfThisRoom() ? "linkCopied" : "linkCopiedJoined"));
+  } catch {
+    showLink(link);          // no clipboard here, such as on a plain address on the home network
+  }
+}
+function showLink(link) {
+  const box = document.createElement("div");
+  box.innerHTML = `<p>${t("linkNotCopied")}</p><input class="link" readonly>`;
+  const input = box.querySelector("input");
+  input.value = link;
+  dialog(t("linkToCopy"), box, [{label: t("close"), default: true, cancel: true}]);
+  input.select();
 }
 
 // A form with one field for your name, for creating or joining.
@@ -985,6 +1121,7 @@ async function openOnline(id) {
     }, t("onlineJoin"));
   } catch (e) {
     console.warn(e);
+    if (e.code === "no-such-room" || e.code === "not-a-member") forgetOnlineGame(id);
     fallBack(e.code === "no-such-room" ? "roomGone" : e.code === "not-a-member" || e.code === "secret-needed" ? "notInRoom"
       : e.code === "seat-taken" ? "seatTaken" : e.code === "wrong-key" ? "inviteNotValid" : "onlineFailed");
   }
@@ -1000,13 +1137,19 @@ async function lookForServer() {
   showMenuItems();
 }
 
+// While someone else plays, the tab's title says when it is your turn.
+function setTitle(hidden = document.hidden) {
+  document.title = room?.online && myTurn() && hidden ? `● ${t("yourTurnShort")} · ${t("title")}` : t("title");
+}
+addEventListener("visibilitychange", () => setTitle());
+
 // --- language ----------------------------------------------------------------
 
 function setLanguage(name) {
   lang = name;
   if (!TEST) try { localStorage.setItem("solfege.lang", name); } catch {}
   document.documentElement.lang = name;
-  document.title = t("title");
+  setTitle();
   for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t);
   for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
   render();
