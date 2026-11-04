@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>solfège duo worker</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#f7f6f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
+<style>
+  :root {
+    --bg: #f7f6f2; --panel: #ffffff; --text: #1d1c1a; --muted: #6d6a63; --line: #dedbd3; --accent: #2f5fb3; --accent-text: #ffffff;
+    --key-white: #fdfdfb; --key-black: #2a2926; --key-line: #b9b5ab; --no: #b3372f; --yes: #23753a; --no-text: #b3372f; --yes-text: #23753a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161614; --panel: #201f1d; --text: #ebe9e4; --muted: #9a968d; --line: #36342f; --accent: #7aa2ec; --accent-text: #10131a; --no-text: #f08a80; --yes-text: #6fcf87; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0 auto; max-width: 46rem; padding: 1rem; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  [hidden] { display: none !important; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  #home { color: inherit; font-size: 1.4rem; font-weight: 700; text-decoration: none; }
+  button { font: inherit; color: inherit; padding: .45rem .9rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  input, select { font: inherit; color: inherit; padding: .4rem .5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+  .lang button { padding: .15rem .5rem; color: var(--muted); }
+  .lang button[aria-pressed=true] { color: var(--text); font-weight: 600; }
+  section, .panel { margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  #game { padding: 0; border: none; background: none; }
+  label.field { display: block; margin-bottom: .75rem; }
+  label.field span { display: block; margin-bottom: .2rem; color: var(--muted); font-size: .9rem; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  #message { margin-bottom: 1rem; color: var(--no-text); font-weight: 600; }
+  .players { display: grid; gap: .25rem; }
+  .who .name { font-weight: 600; }
+  .who .role, .who .score { color: var(--muted); font-size: .9rem; }
+  input.link { width: 100%; margin-bottom: .5rem; }
+  fieldset { margin: 0 0 .75rem; padding: 0; border: none; }
+  fieldset label { display: block; }
+  legend { margin-bottom: .2rem; padding: 0; color: var(--muted); font-size: .9rem; }
+  #said { font-weight: 600; }
+  #result { min-height: 1.45em; }
+  #result.yes { color: var(--yes-text); font-weight: 600; }
+  #result.no { color: var(--no-text); font-weight: 600; }
+  #buttons { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+  kbd { margin-left: .35em; padding: 0 .3em; border: 1px solid currentColor; border-radius: 4px; font: .75em ui-monospace, monospace; opacity: .7; }
+  @media (hover: none) { kbd { display: none; } }
+  .keyboard-scroll { margin-bottom: 1rem; padding-bottom: .25rem; overflow-x: auto; }
+  #keyboard { --key-min: 1.9rem; position: relative; display: flex; height: 9.5rem; min-width: calc(var(--whites) * var(--key-min)); user-select: none; -webkit-user-select: none; }
+  .key { padding: 0; border-radius: 0 0 6px 6px; cursor: default; touch-action: manipulation; }
+  #keyboard.active .key:not(:disabled) { cursor: pointer; }
+  .key.white { flex: 1; min-width: var(--key-min); display: flex; flex-direction: column; justify-content: flex-end; align-items: center; margin-right: -1px; padding-bottom: .4rem; border: 1px solid var(--key-line); background: var(--key-white); color: #55524b; font-size: .72rem; }
+  .key.black { position: absolute; top: 0; z-index: 1; height: 60%; border: 1px solid var(--key-black); background: var(--key-black); }
+  .key.start::before { content: ""; width: .55rem; height: .55rem; margin-bottom: .3rem; border-radius: 50%; background: var(--accent); }
+  .key.black.start { display: flex; }
+  .key.black.start::before { display: block; margin: auto auto .5rem; }
+  .key.note { background: var(--accent) !important; border-color: var(--accent) !important; }
+  .key.wrong { background: var(--no) !important; border-color: var(--no) !important; color: #fff; }
+  .key.right { background: var(--yes) !important; border-color: var(--yes) !important; color: #fff; }
+  @media (max-width: 34rem) {
+    #keyboard { --key-min: 1.25rem; height: 8rem; }
+    .key.white { font-size: .6rem; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <a id="home" href="./" data-t="title"></a>
+  <span class="lang" role="group" aria-label="Taal / Language">
+    <button type="button" data-lang="nl" lang="nl">NL</button>
+    <button type="button" data-lang="en" lang="en">EN</button>
+  </span>
+</header>
+<p id="message" role="alert" hidden></p>
+
+<section id="start" hidden>
+  <p data-t="intro"></p>
+  <label class="field"><span data-t="yourName"></span><input id="start-name" maxlength="40" autocomplete="off"></label>
+  <button type="button" class="primary" id="create" data-t="create"></button>
+  <button type="button" id="continue" data-t="continue" hidden></button>
+  <p class="muted" data-t="needsNetwork"></p>
+</section>
+
+<section id="join" hidden>
+  <p id="join-note"></p>
+  <label class="field"><span data-t="yourName"></span><input id="join-name" maxlength="40" autocomplete="off"></label>
+  <button type="button" class="primary" id="join-button" data-t="join"></button>
+</section>
+
+<div id="game" hidden>
+  <div class="panel players">
+    <div class="who" id="seat-0"><span class="name"></span> <span class="role"></span> <div class="score"></div></div>
+    <div class="who" id="seat-1"><span class="name"></span> <span class="role"></span> <div class="score"></div></div>
+  </div>
+  <p id="connection" class="muted" role="status" data-t="offline" hidden></p>
+  <p id="sound-notice" class="muted" role="status" data-t="soundLocked" hidden></p>
+  <div id="invite" class="panel" hidden>
+    <p data-t="inviteNote"></p>
+    <input id="invite-link" class="link" readonly>
+    <button type="button" id="copy" data-t="copy"></button>
+  </div>
+  <div id="roles" class="panel" hidden>
+    <fieldset id="roles-who"><legend data-t="rolesTitle"></legend></fieldset>
+    <label class="field"><span data-t="startNote"></span><select id="roles-start"></select></label>
+    <button type="button" class="primary" id="begin" data-t="begin"></button>
+  </div>
+  <p id="said" role="status"></p>
+  <p id="result" role="status"></p>
+  <div id="buttons" hidden>
+    <button type="button" class="primary" id="play-both" data-t="playBoth"></button>
+    <button type="button" id="play-second" data-t="playSecond"></button>
+    <button type="button" id="give-up" data-t="giveUp"></button>
+  </div>
+  <div class="keyboard-scroll" id="keyboard-box" hidden><div id="keyboard"></div></div>
+  <button type="button" id="change-roles" data-t="changeRoles" hidden></button>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
