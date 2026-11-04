@@ -3,7 +3,7 @@
   "short_name": "piano",
   "description": "Een pianoklavier dat een reeks noten opneemt en weer afspeelt.",
   "lang": "nl",
-  "id": "./",
+  "id": "/piano/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -3,7 +3,7 @@
   "short_name": "Vier op een rij",
   "description": "Laat je schijven vallen en maak als eerste vier op een rij, tegen de computer.",
   "lang": "nl",
-  "id": "./",
+  "id": "/four-in-a-row/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -3,7 +3,7 @@
   "short_name": "Tile Rummy",
   "description": "Een stenenspel voor jou en één tot drie computerspelers.",
   "lang": "nl",
-  "id": "./",
+  "id": "/rummy/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -3,7 +3,7 @@
   "short_name": "solfège",
   "description": "Gehoortraining: hoor een beginnoot en nog een noot, en benoem de tweede.",
   "lang": "nl",
-  "id": "./",
+  "id": "/solfege/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
