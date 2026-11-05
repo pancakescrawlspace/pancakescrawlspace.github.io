@@ -2,6 +2,7 @@
 export const STRINGS = {
   nl: {
     title: "solfège duo",
+    via: "Deze versie loopt via Firebase, een dienst van Google die het spel bewaart.",
     intro: "Met z'n tweeën gehoor trainen. De speler speelt een noot, de luisteraar hoort eerst de beginnoot en dan die noot, en zoekt de tweede op het klavier.",
     yourName: "Je naam", create: "Nieuw spel", continue: "Verder met je spel", needsNetwork: "Voor een spel is een netwerkverbinding nodig.",
     someone: "Speler", you: "jij", speler: "speler", luisteraar: "luisteraar", away: "afwezig", invited: "uitgenodigd",
@@ -25,6 +26,7 @@ export const STRINGS = {
   },
   en: {
     title: "solfège duo",
+    via: "This version works through Firebase, a Google service that keeps the game.",
     intro: "Train your ear with two people. The speler plays a note, and the luisteraar hears the start note and then that note, and finds the second on the keyboard.",
     yourName: "Your name", create: "New game", continue: "Back to your game", needsNetwork: "A game needs a network connection.",
     someone: "Player", you: "you", speler: "speler", luisteraar: "luisteraar", away: "away", invited: "invited",

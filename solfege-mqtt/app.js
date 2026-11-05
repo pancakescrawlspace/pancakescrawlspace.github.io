@@ -348,6 +348,7 @@ function setLanguage(name) {
   keep(LANG_KEY, name);
   document.documentElement.lang = name;
   for (const el of document.querySelectorAll("[data-t]")) el.innerHTML = t(el.dataset.t);
+  for (const el of document.querySelectorAll("[data-t-title]")) el.title = t(el.dataset.tTitle);
   for (const button of document.querySelectorAll("[data-lang]")) button.setAttribute("aria-pressed", button.dataset.lang === name);
   setTitle();
   render();
