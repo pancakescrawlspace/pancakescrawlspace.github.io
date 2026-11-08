@@ -1,9 +1,9 @@
-// The multiplayer layer's interface for games: rooms on the multiplayer server,
-// with the same interface as a game's local room (watch, play, mySeat). It knows
-// nothing of any game, and has no user interface; each game draws its own. No
+// The multiplayer layer's interface for games: rooms on the multiplayer server, or on our
+// Cloudflare Worker, with the same interface as a game's local room (watch, play, mySeat).
+// It knows nothing of any game, and has no user interface; each game draws its own. No
 // dependencies. See README.md.
 //
-//   const mp = await connect({game: "connect4", realProject: true});
+//   const mp = await connect({game: "connect4", realProject: true});   // on the Worker if no server serves the page
 //   await mp.signIn({secret});              // only to create games, if the server has a secret
 //   const room = await mp.create({seats, state, current: 0});
 //   room.inviteLinks[1]                     // to send to the person for seat 1
@@ -31,30 +31,23 @@ export class RoomRefusal extends Error {
   }
 }
 
-// Our project on Firebase, for pages that no multiplayer server serves. None of this is
-// a secret: it only says which project is meant, and firebase/database.rules.json says
-// who may do what there.
-const FIREBASE_PROJECT = {
-  apiKey: "AIzaSyDMrcVe3eBPGup0iSGALAJEF_rOo6QPJZY",
-  authDomain: "games-f66f0.firebaseapp.com",
-  databaseURL: "https://games-f66f0-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "games-f66f0",
-  storageBucket: "games-f66f0.firebasestorage.app",
-  messagingSenderId: "538105910348",
-  appId: "1:538105910348:web:f77fc4c47c07eb19b490e9",
-};
+// Our Worker (worker/worker.js), for pages that no multiplayer server serves. Its address
+// isn't a secret: the Worker's password and session key are.
+export const WORKER = "https://games.pancakescrawlspace.workers.dev";
 
-async function serverIsThere(base) {
+async function health(base) {
   try {
     const answer = await fetch(`${base}/api/health`, {cache: "no-store"});
-    return answer.ok && (await answer.json()).multiplayer === true;
+    const data = answer.ok ? await answer.json() : null;
+    return data?.multiplayer === true ? data : null;
   } catch {
-    return false;
+    return null;
   }
 }
+const serverIsThere = async base => Boolean(await health(base));
 // Whether rooms are there to use, for a game to decide whether to offer them: on a
-// multiplayer server that serves this page, or else on Firebase, if the game allows that.
-// Test pages don't, so that they never touch the real project.
+// multiplayer server that serves this page, or else on our Worker, if the game allows that.
+// Test pages don't, so that they never touch the real Worker.
 export async function available(base = "..", {realProject = false} = {}) {
   return realProject || serverIsThere(base);
 }
@@ -94,13 +87,31 @@ export function unscrambled(value) {
   return JSON.parse(new TextDecoder().decode(bytes.map((byte, i) => byte ^ stream[i])));
 }
 
-export async function connect({game, base = "..", sessionName = "multiplayer.session", storage = localStorage, page, scramble = false, firebase = null, realProject = false} = {}) {
-  // {config}, or "emulator" for the tests: the rooms are on Firebase instead of our own server. See firebase.js.
-  if (!firebase && realProject && !await serverIsThere(base)) firebase = {config: FIREBASE_PROJECT};
-  if (firebase) {
-    const {connectFirebase} = await import("./firebase.js");
-    return connectFirebase({game, sessionName, page, scramble, ...(firebase === "emulator" ? {emulator: true} : firebase)});
-  }
+// The live updates come over Server-Sent Events from the server, which reconnect by
+// themselves, and over a WebSocket from the Worker, which lets a room sleep between moves.
+// That one is pinged, so that a connection gone silent is noticed, and is reconnected here.
+const PING_EVERY = 25 * 1000, SILENT_FOR = 60 * 1000, RECONNECT_AFTER = [500, 1000, 2000, 5000, 10000];
+
+// For the tests: acts as if the network were gone, for the live updates of every room this page
+// watches, from any connect().
+let offline = false;
+const watched = new Set();
+const forTests = {
+  goOffline() {
+    offline = true;
+    for (const room of watched) room.cutOff();
+  },
+  goOnline() {
+    offline = false;
+    for (const room of watched) room.reconnect();
+  },
+};
+
+export async function connect({game, base = "..", sessionName = "multiplayer.session", storage = localStorage, page, scramble = false, realProject = false} = {}) {
+  if (realProject && !await serverIsThere(base)) base = WORKER;
+  // Which kind of live updates, asked once, when a room is first watched.
+  let liveKind = null;
+  const kindOfLive = () => liveKind ??= health(base).then(data => data?.live === "websocket" ? "websocket" : "events");
   let token = null;
   try { token = storage.getItem(sessionName); } catch {}
 
@@ -141,8 +152,84 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
   const toSend = state => scramble ? scrambled(state) : state;
 
   function roomFor(id, firstRecord, mySeat, invites = {}) {
-    let record = plain(firstRecord), source = null;
+    let record = plain(firstRecord), live = null;
     const watchers = new Set();
+    const news = data => {
+      const next = plain(data);
+      if (next.turn < record.turn) return;
+      record = next;
+      for (const each of watchers) each(structuredClone(next));
+    };
+    const presence = seats => {
+      room.present = seats;
+      room.onPresence(seats);
+    };
+
+    function eventSource() {
+      const source = new EventSource(`${base}/api/rooms/${id}/events?token=${encodeURIComponent(token)}`);
+      source.onopen = () => room.onConnection(true);
+      source.onerror = () => room.onConnection(false);
+      source.onmessage = event => news(JSON.parse(event.data));
+      source.addEventListener("presence", event => presence(JSON.parse(event.data)));
+      return {close: () => source.close()};
+    }
+
+    // A WebSocket that comes back after it drops, until closed here.
+    function webSocket() {
+      let socket = null, pinger = null, retry = null, tries = 0, heard = 0, closed = false;
+      const address = new URL(`${base}/api/rooms/${id}/live`, location.href);
+      address.protocol = address.protocol === "https:" ? "wss:" : "ws:";
+      function open() {
+        address.searchParams.set("token", token);
+        socket = new WebSocket(address);
+        socket.onopen = () => {
+          tries = 0;
+          heard = Date.now();
+          room.onConnection(true);
+          pinger = setInterval(() => {
+            if (Date.now() - heard > SILENT_FOR) lost();
+            else socket.send("ping");
+          }, PING_EVERY);
+        };
+        socket.onmessage = event => {
+          heard = Date.now();
+          if (event.data === "pong") return;
+          const data = JSON.parse(event.data);
+          if (data.record) news(data.record);
+          if (data.presence) presence(data.presence);
+        };
+        socket.onclose = lost;
+      }
+      // Closed by the other end, or silent for too long: a dead connection may take a while to
+      // finish closing, so this one is let go at once, and a new one tried.
+      function lost() {
+        if (!socket) return;
+        const old = socket;
+        socket = null;
+        old.onopen = old.onmessage = old.onclose = null;
+        clearInterval(pinger);
+        try { old.close(); } catch {}
+        if (closed) return;
+        room.onConnection(false);
+        retry = setTimeout(open, RECONNECT_AFTER[Math.min(tries++, RECONNECT_AFTER.length - 1)]);
+      }
+      open();
+      return {
+        close() {
+          closed = true;
+          clearTimeout(retry);
+          clearInterval(pinger);
+          socket?.close();
+        },
+      };
+    }
+
+    // Opens the live updates, unless they are open, nobody watches, or the network is "gone" in a test.
+    async function goLive() {
+      const kind = await kindOfLive();
+      if (live || !watchers.size || offline) return;
+      live = kind === "websocket" ? webSocket() : eventSource();
+    }
     const room = {
       id,
       online: true,
@@ -157,22 +244,9 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
       // Calls `watcher` with the record, now and after every change. Returns the function that stops it.
       watch(watcher) {
         watchers.add(watcher);
+        watched.add(room);
         Promise.resolve().then(() => { if (watchers.has(watcher)) watcher(structuredClone(record)); });
-        if (!source) {
-          source = new EventSource(`${base}/api/rooms/${id}/events?token=${encodeURIComponent(token)}`);
-          source.onopen = () => room.onConnection(true);
-          source.onerror = () => room.onConnection(false);
-          source.onmessage = event => {
-            const news = plain(JSON.parse(event.data));
-            if (news.turn < record.turn) return;
-            record = news;
-            for (const each of watchers) each(structuredClone(news));
-          };
-          source.addEventListener("presence", event => {
-            room.present = JSON.parse(event.data);
-            room.onPresence(room.present);
-          });
-        }
+        goLive();
         return () => {
           watchers.delete(watcher);
           if (!watchers.size) room.close();
@@ -186,14 +260,30 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
       },
 
       close() {
-        source?.close();
-        source = null;
+        live?.close();
+        live = null;
+        watched.delete(room);
       },
+
+      // For the tests' switch below.
+      cutOff() {
+        if (!live) return;
+        live.close();
+        live = null;
+        room.onConnection(false);
+      },
+      reconnect: goLive,
     };
     return room;
   }
 
   return {
+    // Where the rooms are: this page's server, or the Worker.
+    base,
+
+    // For the tests: cuts the page's live updates off, as a lost network would, and brings them back.
+    test: forTests,
+
     // Gives the creators' secret, to be allowed to create games. A session you have stays.
     async signIn({secret}) {
       const answer = await request("session", {secret});

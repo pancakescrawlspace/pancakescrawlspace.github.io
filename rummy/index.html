@@ -498,8 +498,6 @@ const STRINGS = {
     stopGameAsk: "Dit spel stoppen en alles wat ervan bewaard is wissen, ook de scores? Dat kan niet ongedaan worden gemaakt.",
     gameStopped: "Het spel is gestopt en gewist.", gameStoppedElsewhere: "Dit spel is in een ander tabblad gestopt en gewist.",
     moveSuspect: name => `${name ? `De laatste zet van ${name}` : "Je laatste zet"} klopt niet met de spelregels. Het spel gaat door, maar de stand is misschien niet meer te vertrouwen.`,
-    googleNote: "Om een spel aan te maken, moet je inloggen met een Google-account dat op de lijst staat.", googleSignIn: "Inloggen met Google",
-    creatorNotListed: uid => `Dit Google-account staat niet op de lijst van wie spellen mag aanmaken. Vraag de beheerder het toe te voegen. Je nummer is: ${uid}`,
     secretTitle: "Spellen aanmaken", secretNote: "Op deze server mag je alleen een spel aanmaken als je het wachtwoord kent. Dat hoef je maar één keer in te vullen.", secretLabel: "Wachtwoord",
     secretWrong: "Dat wachtwoord klopt niet.", secretTooMany: "Te vaak geprobeerd. Wacht een minuut.", tooManyRooms: "De server heeft al te veel spellen.",
     playOnline: "Online spelen...", showInvite: "Spellinks...", yourName: "Je naam", onlineNote: "Je maakt een spel aan en krijgt een link voor elke andere speler.",
@@ -582,8 +580,6 @@ const STRINGS = {
     stopGameAsk: "Stop this game and delete everything kept of it, the scores too? This can't be undone.",
     gameStopped: "The game has been stopped and deleted.", gameStoppedElsewhere: "This game was stopped and deleted in another tab.",
     moveSuspect: name => `${name ? `${name}'s last move doesn't` : "Your last move doesn't"} fit the rules. The game goes on, but the score may not be reliable any more.`,
-    googleNote: "To create a game, sign in with a Google account that is on the list.", googleSignIn: "Sign in with Google",
-    creatorNotListed: uid => `This Google account isn't on the list of those who may create games. Ask whoever runs this to add it. Your number is: ${uid}`,
     secretTitle: "Creating games", secretNote: "On this server you can only create a game if you know the password. You only have to enter it once.", secretLabel: "Password",
     secretWrong: "That password isn't right.", secretTooMany: "Too many tries. Please wait a minute.", tooManyRooms: "The server has too many games already.",
     playOnline: "Play online...", showInvite: "Game links...", yourName: "Your name", onlineNote: "You create a game, and get a link for every other player.",
@@ -1933,9 +1929,12 @@ $("#sort-color").addEventListener("click", () => sortRack(true));
 // --- playing online ----------------------------------------------------------------
 //
 // Through the multiplayer layer (../multiplayer/client.js): on a multiplayer server if one
-// serves this page, or else on Firebase. The state, turns, referee and computer players are
+// serves this page, or else on our Worker. The state, turns, referee and computer players are
 // the same as in any other game: only the room is another one. Without the layer, such as
 // offline, none of this is offered.
+
+// Where to look for a multiplayer server: next to the page, or in tests one given as &base=.
+const LAYER_BASE = TEST && params.get("base") || "..";
 let layer = null, connection = null, serverThere = false;
 const loadLayer = async () => { layer ??= await import("../multiplayer/client.js"); return layer; };
 async function connectToLayer() {
@@ -1943,7 +1942,7 @@ async function connectToLayer() {
   connection ??= await connect({
     game: "rummy",
     scramble: true,
-    firebase: TEST && params.get("firebase") === "emulator" ? (params.has("unlisted") ? {emulator: true, listOnSignIn: false} : "emulator") : undefined,
+    base: LAYER_BASE,
     realProject: !TEST,
     sessionName: TEST && params.get("session") ? `multiplayer.test.${params.get("session")}` : undefined,
     page: location.origin + location.pathname + (TEST ? "?test" : ""),
@@ -1952,7 +1951,7 @@ async function connectToLayer() {
 }
 async function lookForServer() {
   try {
-    serverThere = await (await loadLayer()).available("..", {realProject: !TEST});
+    serverThere = await (await loadLayer()).available(LAYER_BASE, {realProject: !TEST});
   } catch {
     serverThere = false;                // no layer here, such as offline
   }
@@ -2032,31 +2031,13 @@ async function createOnline(name, others, retried = false) {
     showInvites();
   } catch (e) {
     console.warn(e);
-    if (e.code === "secret-needed" && retried) message(t("creatorNotListed", (await connectToLayer()).uid?.() ?? ""));
-    else if (e.code === "secret-needed") askSecret(() => createOnline(name, others, true));
+    if (e.code === "secret-needed" && !retried) askSecret(() => createOnline(name, others, true));
     else message(t(e.code === "too-many-rooms" ? "tooManyRooms" : "onlineFailed"));
   }
 }
 
 // A server with a secret only lets those who know it create games: asks once, and tries again.
-// On Firebase it takes a Google account on the list of creators instead.
 async function askSecret(retry) {
-  const mp = await connectToLayer();
-  if (mp.usesGoogle) {
-    dialog(t("secretTitle"), `<p data-google>${t("googleNote")}</p>`, [
-      {label: t("googleSignIn"), default: true, action: async () => {
-        try {
-          await mp.signIn();
-          retry();
-        } catch (e) {
-          console.warn(e);
-          message(t("onlineFailed"));
-        }
-      }},
-      {label: t("cancel"), cancel: true},
-    ]);
-    return;
-  }
   const form = document.createElement("form");
   form.innerHTML = `<p>${t("secretNote")}</p><label class="field"><span>${t("secretLabel")}</span> <input name="secret" type="password" autocomplete="off"></label>`;
   form.addEventListener("submit", e => e.preventDefault());
