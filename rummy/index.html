@@ -329,6 +329,8 @@
       <button type="button" role="menuitem" data-act="twoTabs"><span data-t="twoTabs"></span></button>
       <button type="button" role="menuitem" data-act="online" hidden><span data-t="playOnline"></span></button>
       <button type="button" role="menuitem" data-act="invite" hidden><span data-t="copyGameLink"></span></button>
+      <button type="button" role="menuitem" data-act="push" hidden><span data-t="pushOn"></span></button>
+      <button type="button" role="menuitem" data-act="joinLink" hidden><span data-t="joinLink"></span></button>
       <hr>
       <button type="button" role="menuitemradio" data-act="opp" data-n="1"><span data-t="opp1"></span></button>
       <button type="button" role="menuitemradio" data-act="opp" data-n="2"><span data-t="opp2"></span></button>
@@ -501,6 +503,12 @@ const STRINGS = {
     secretTitle: "Spellen aanmaken", secretNote: "Op deze server mag je alleen een spel aanmaken als je het wachtwoord kent. Dat hoef je maar één keer in te vullen.", secretLabel: "Wachtwoord",
     secretWrong: "Dat wachtwoord klopt niet.", secretTooMany: "Te vaak geprobeerd. Wacht een minuut.", tooManyRooms: "De server heeft al te veel spellen.",
     playOnline: "Online spelen...", showInvite: "Spellinks...", yourName: "Je naam", onlineNote: "Je maakt een spel aan en krijgt een link voor elke andere speler.",
+    pushOn: "Melden als ik aan de beurt ben", pushOff: "Niet meer melden als ik aan de beurt ben",
+    pushIsOn: "Je krijgt nu een melding als je aan de beurt bent en het spel niet openstaat, ook in je andere online spellen in deze browser.",
+    pushInstall: "Op een iPhone of iPad kan dat alleen als het spel op je beginscherm staat: tik op Deel en kies Zet op beginscherm. Open het daarna vanaf het beginscherm, en doe daar mee met de link uit de uitnodiging, via Meedoen met een link.",
+    pushBlocked: "Deze browser mag van jou geen meldingen van deze site laten zien. Dat kun je veranderen in de instellingen van de browser, bij deze site.",
+    pushFailed: "Meldingen aanzetten lukte niet.",
+    joinLink: "Meedoen met een link...", joinLinkNote: "Plak hier de link uit de uitnodiging.", joinLinkLabel: "Link", joinLinkBad: "Dat is geen uitnodiging voor dit spel.",
     seatPerson: "een persoon", seatComputer: "een computerspeler", seatNone: "niemand", onlineCreate: "Aanmaken", onlineJoin: "Meedoen",
     onlineNeedsPerson: "Een online spel heeft minstens één andere persoon nodig.", onlineFailed: "Dat lukte niet: de multiplayer-server reageert niet goed.",
     copyGameLink: "Spellink kopiëren", linkToCopy: "Spellink",
@@ -583,6 +591,12 @@ const STRINGS = {
     secretTitle: "Creating games", secretNote: "On this server you can only create a game if you know the password. You only have to enter it once.", secretLabel: "Password",
     secretWrong: "That password isn't right.", secretTooMany: "Too many tries. Please wait a minute.", tooManyRooms: "The server has too many games already.",
     playOnline: "Play online...", showInvite: "Game links...", yourName: "Your name", onlineNote: "You create a game, and get a link for every other player.",
+    pushOn: "Tell me when it's my turn", pushOff: "Stop telling me when it's my turn",
+    pushIsOn: "You'll now get a notification when it's your turn and the game isn't open, in your other online games in this browser too.",
+    pushInstall: "On an iPhone or iPad, that only works for a game on your Home Screen: tap Share and choose Add to Home Screen. Then open it from the Home Screen, and join there with the link from the invitation, through Join with a link.",
+    pushBlocked: "You've told this browser not to show notifications from this site. You can change that in the browser's settings, for this site.",
+    pushFailed: "Turning notifications on didn't work.",
+    joinLink: "Join with a link...", joinLinkNote: "Paste the link from the invitation here.", joinLinkLabel: "Link", joinLinkBad: "That isn't an invitation to this game.",
     seatPerson: "a person", seatComputer: "a computer player", seatNone: "nobody", onlineCreate: "Create", onlineJoin: "Join",
     onlineNeedsPerson: "An online game needs at least one other person.", onlineFailed: "That didn't work: the multiplayer server isn't answering properly.",
     copyGameLink: "Copy game link", linkToCopy: "Game link",
@@ -1101,7 +1115,9 @@ function followUp() {
 function endTurn(state, seat) {
   ui.sent = record.turn;
   const next = state.over ? state : advanceTurn(state);
-  room.play({state: next, current: whoWrites(next)}, seat === mySeat ? {} : {forSeat: seat}).catch(refused);
+  // The move that ends a game tells every other person, not only the one at turn.
+  const options = {...(seat === mySeat ? {} : {forSeat: seat}), ...(room.online && next.over ? {notify: "all"} : {})};
+  room.play({state: next, current: whoWrites(next)}, options).catch(refused);
 }
 
 // Plays the move a computer player came up with, or draws if there is none.
@@ -1870,6 +1886,7 @@ function leaveGame() {
 }
 
 function openMenu() {
+  showPushItem();
   ui.menu = true;
   $("#menu").hidden = false;
   $("#menu-button").setAttribute("aria-expanded", "true");
@@ -1900,6 +1917,8 @@ for (const item of document.querySelectorAll(".menu [data-act]")) {
     else if (act === "twoTabs") askTwoTabs();
     else if (act === "online") askOnline();
     else if (act === "invite") copyGameLink();
+    else if (act === "push") togglePush();
+    else if (act === "joinLink") askJoinLink();
     else if (act === "opp") { const n = Number(item.dataset.n); if (n !== game?.players.length - 1) setOpponents(n); }
     else if (act === "scores") showScores(null);
     else if (act === "options") showOptions();
@@ -1967,6 +1986,68 @@ function showMenuItems() {
   span.dataset.t = Object.keys(invitesOfThisRoom() ?? {}).length > 1 ? "showInvite" : "copyGameLink";
   span.textContent = t(span.dataset.t);
   $('[data-act="stop"]').hidden = online;      // it would only stop it for you
+  $('[data-act="joinLink"]').hidden = !serverThere || !installed();
+}
+
+// --- notifications when it's your turn -----------------------------------------
+//
+// The layer does the work, and sw.js shows them, with ../multiplayer/push-sw.js. The menu item
+// says what this browser allows, as of when the menu opened.
+let pushState = null;
+async function showPushItem() {
+  const item = $('[data-act="push"]');
+  try {
+    pushState = room?.online ? await (await connectToLayer()).pushState() : null;
+  } catch {
+    pushState = null;
+  }
+  item.hidden = !pushState;
+  const span = item.querySelector("span");
+  span.dataset.t = pushState === "on" ? "pushOff" : "pushOn";
+  span.textContent = t(span.dataset.t);
+}
+// pushOn first, before anything is awaited: some browsers only ask for permission during a click.
+async function togglePush() {
+  if (!connection || !room?.online) return;
+  const games = [room.id, ...onlineGames().map(({id}) => id)];
+  if (pushState === "install-first") message(t("pushInstall"));
+  else if (pushState === "blocked") message(t("pushBlocked"));
+  else if (pushState === "on") await connection.pushOff(games).catch(e => console.warn(e));
+  else {
+    try {
+      await connection.pushOn(games);
+      await layer.setPushLanguage(lang);
+      message(t("pushIsOn"));
+    } catch (e) {
+      console.warn(e);
+      message(t(e.code === "push-blocked" ? "pushBlocked" : "pushFailed"));
+    }
+  }
+  showPushItem();
+}
+
+// Running as an installed app. On an iPhone or iPad that is a browser of its own, which invite
+// links don't open, so the link is pasted in here instead.
+const installed = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true || (TEST && params.has("installed"));
+function askJoinLink() {
+  const form = document.createElement("form");
+  form.innerHTML = `<p></p><label class="field"><span>${t("joinLinkLabel")}</span> <input name="link" autocomplete="off"></label>`;
+  form.querySelector("p").textContent = t("joinLinkNote");
+  const input = form.querySelector("input");
+  const go = async () => {
+    const here = new URL(location.href), folder = path => path.replace(/index\.html$/, "");
+    let link = null;
+    try { link = new URL(input.value.trim()); } catch {}
+    if (!link || link.origin !== here.origin || folder(link.pathname) !== folder(here.pathname) || !(await loadLayer()).parseInvite(link.href)) {
+      message(t("joinLinkBad"));
+      return;
+    }
+    if (TEST) for (const key of ["session", "base", "keep"]) if (params.has(key)) link.searchParams.set(key, params.get(key));
+    location.href = link.href;
+  };
+  form.addEventListener("submit", e => { e.preventDefault(); closeDialog(); go(); });
+  dialog(t("joinLink").replace("...", ""), form, [{label: t("onlineJoin"), default: true, action: go}, {label: t("cancel"), cancel: true}]);
+  input.focus();
 }
 
 // The online games this browser is in, to go back to them. Only a note of each: the game is on the server.
@@ -2210,6 +2291,7 @@ function setLanguage(name) {
   for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t);
   for (const b of document.querySelectorAll("[data-lang]")) b.setAttribute("aria-pressed", b.dataset.lang === name);
   if (game) render();
+  if (pushState === "on") layer?.setPushLanguage(name);
 }
 for (const b of document.querySelectorAll("[data-lang]")) b.addEventListener("click", () => setLanguage(b.dataset.lang));
 

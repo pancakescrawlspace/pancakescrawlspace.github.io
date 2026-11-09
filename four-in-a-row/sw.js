@@ -6,6 +6,30 @@
 // when the list of PAGE files changes.
 "use strict";
 
+// Notifications when it's your turn in an online game, through the multiplayer layer. Without
+// that file, as in a copy of the game on its own, it works as before.
+try {
+  importScripts("../multiplayer/push-sw.js");
+  self.tellTurns({
+    name: {nl: "Vier op een rij", en: "Four in a Row"},
+    icon: "icon-192.png",
+    nl: {
+      someone: "Je tegenstander",
+      turn: by => `${by} heeft gezet. Jij bent aan de beurt.`,
+      started: by => `${by} doet mee. Jij bent aan de beurt.`,
+      over: by => `${by} deed de laatste zet: het spel is uit.`,
+    },
+    en: {
+      someone: "Your opponent",
+      turn: by => `${by} has played. It's your turn.`,
+      started: by => `${by} has joined. It's your turn.`,
+      over: by => `${by} made the last move: the game is over.`,
+    },
+  });
+} catch (e) {
+  console.warn(e);
+}
+
 const PAGE_CACHE = "connect4-page-1";
 const PAGE = ["./", "index.html", "rules.js", "ai.js", "room.js", "worker.js", "manifest.webmanifest", "icon.svg",
               "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"];

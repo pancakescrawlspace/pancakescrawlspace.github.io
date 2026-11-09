@@ -12,12 +12,23 @@
 //   room.watch(record => { … });            // now, and after every change
 //   await room.play({state, current});      // refused if it isn't your turn, or stale
 //   await room.play({state, current}, {forSeat: 2});   // a computer player's turn
+//   await room.play({state, current}, {notify: "all"}); // the move that ends the game: tell everyone
+//
+//   await mp.pushState()                    // "available", "on", "install-first", "blocked" or null
+//   await mp.pushOn(roomIds)                // in a click handler: notifications when it's your turn
+//   await mp.pushOff(roomIds)
 //
 // A refusal is an error with a `code`, the server's word for it: "stale",
 // "out-of-turn", "seat-taken", "wrong-key", "not-started", "no-such-room", "secret-needed",
 // "wrong-secret", "too-many-rooms", "too-many-attempts"...
 //
 // A record is {version, game, seats, started, current, turn, state}.
+//
+// Notifications: with push on, this browser's push address goes to every room it creates, joins
+// or opens, and the room tells it when it's this player's turn and no page of theirs is on
+// screen. So each page with live updates open says when it is hidden or visible. The words of
+// a notification are the game's, in its service worker, with push-sw.js. See
+// docs/architecture.md, "Telling a player it's their turn".
 //
 // connect({scramble: true}) scrambles the state on its way to the server and back. The
 // key is in this file, so it only stops a glance at the record, not a determined
@@ -92,6 +103,28 @@ export function unscrambled(value) {
 // That one is pinged, so that a connection gone silent is noticed, and is reconnected here.
 const PING_EVERY = 25 * 1000, SILENT_FOR = 60 * 1000, RECONNECT_AFTER = [500, 1000, 2000, 5000, 10000];
 
+// Names a page's live connection to a room, so that the page can say whether it is on screen.
+const pageId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), byte => "abcdefghijklmnopqrstuvwxyz0123456789"[byte % 36]).join("");
+const pageHidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+
+const toBase64url = data => btoa(String.fromCharCode(...new Uint8Array(data))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const fromBase64url = text => Uint8Array.from(atob(text.replace(/-/g, "+").replace(/_/g, "/")), char => char.charCodeAt(0));
+
+// Where a game's service worker finds the language for its notifications: it can't read localStorage.
+const PUSH_SETTINGS = "multiplayer-push";
+export async function setPushLanguage(lang, page = location.href) {
+  try {
+    await (await caches.open(PUSH_SETTINGS)).put(new URL("push-language", page), new Response(lang));
+  } catch {}
+}
+
+// An iPhone or iPad, in the browser rather than from the Home Screen, where push isn't allowed.
+function appleWithoutHomeScreen() {
+  if (typeof navigator === "undefined") return false;
+  const apple = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return apple && !navigator.standalone && !matchMedia("(display-mode: standalone)").matches;
+}
+
 // For the tests: acts as if the network were gone, for the live updates of every room this page
 // watches, from any connect().
 let offline = false;
@@ -107,18 +140,28 @@ const forTests = {
   },
 };
 
-export async function connect({game, base = "..", sessionName = "multiplayer.session", storage = localStorage, page, scramble = false, realProject = false} = {}) {
+// `pushManager` is for the tests: a stand-in for the browser's, whose push addresses lead to an
+// inbox on the test server.
+export async function connect({game, base = "..", sessionName = "multiplayer.session", storage = localStorage, page, scramble = false, realProject = false, pushManager = null} = {}) {
   if (realProject && !await serverIsThere(base)) base = WORKER;
-  // Which kind of live updates, asked once, when a room is first watched.
-  let liveKind = null;
-  const kindOfLive = () => liveKind ??= health(base).then(data => data?.live === "websocket" ? "websocket" : "events");
+  // What the back end offers, asked once, when first needed.
+  let healthAnswer = null;
+  const healthOf = () => healthAnswer ??= health(base);
+  const kindOfLive = () => healthOf().then(data => data?.live === "websocket" ? "websocket" : "events");
+  // The rooms this connection has opened, and the tests' stand-in for hiding the page.
+  const rooms = new Map();
+  let hiddenForTests = null;
+  const isHidden = () => hiddenForTests ?? pageHidden();
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => { for (const room of rooms.values()) room.sayVisibility(); });
+  }
   let token = null;
   try { token = storage.getItem(sessionName); } catch {}
 
-  async function request(path, body) {
+  async function request(path, body, extra = {}) {
     const headers = token ? {Authorization: `Bearer ${token}`} : {};
     const answer = await fetch(`${base}/api/${path}`, body === undefined ? {headers, cache: "no-store"}
-      : {method: "POST", headers: {...headers, "Content-Type": "application/json"}, body: JSON.stringify(body)});
+      : {method: "POST", headers: {...headers, "Content-Type": "application/json"}, body: JSON.stringify(body), ...extra});
     const data = await answer.json().catch(() => ({}));
     if (!answer.ok) throw new RoomRefusal(data.error ?? `status-${answer.status}`);
     return data;
@@ -151,8 +194,49 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
   const plain = record => ({...record, state: unscrambled(record.state)});
   const toSend = state => scramble ? scrambled(state) : state;
 
+  // --- notifications ---
+
+  // The browser's push manager, or the tests' stand-in. Null where there's no push.
+  async function managerOf() {
+    if (pushManager) return pushManager;
+    if (typeof navigator === "undefined" || !navigator.serviceWorker || typeof PushManager === "undefined") return null;
+    return (await navigator.serviceWorker.getRegistration())?.pushManager ?? null;
+  }
+  const pushKey = async () => (await healthOf())?.push ?? null;
+  // Whether a subscription was made with this back end's key. An older browser may not say.
+  const madeWith = (subscription, key) => {
+    const own = subscription.options?.applicationServerKey;
+    return !own || toBase64url(own) === key;
+  };
+  const addressOf = subscription => {
+    const {endpoint, keys} = subscription.toJSON();
+    return {endpoint, keys: {p256dh: keys.p256dh, auth: keys.auth}};
+  };
+  // This browser's push address, if push is on here.
+  async function pushAddress() {
+    const key = await pushKey();
+    const manager = key && await managerOf();
+    const subscription = manager && await manager.getSubscription().catch(() => null);
+    return subscription && madeWith(subscription, key) ? addressOf(subscription) : null;
+  }
+  // Gives these rooms the address, or null to take it back. A room that's gone, or that this
+  // session isn't in, is passed over; an address the back end won't take is an error.
+  async function giveAddress(ids, subscription) {
+    await Promise.all([...new Set(ids)].map(id => asked(`rooms/${id}/push`, {subscription}).catch(error => {
+      if (error.code === "bad-subscription") throw error;
+    })));
+  }
+  // A room just created, joined or opened gets this browser's address, if push is on.
+  async function shareAddress(id) {
+    try {
+      const subscription = await pushAddress();
+      if (subscription) await giveAddress([id], subscription);
+    } catch {}
+  }
+
   function roomFor(id, firstRecord, mySeat, invites = {}) {
     let record = plain(firstRecord), live = null;
+    const thisPage = pageId();
     const watchers = new Set();
     const news = data => {
       const next = plain(data);
@@ -166,7 +250,7 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
     };
 
     function eventSource() {
-      const source = new EventSource(`${base}/api/rooms/${id}/events?token=${encodeURIComponent(token)}`);
+      const source = new EventSource(`${base}/api/rooms/${id}/events?token=${encodeURIComponent(token)}&page=${thisPage}&visible=${isHidden() ? 0 : 1}`);
       source.onopen = () => room.onConnection(true);
       source.onerror = () => room.onConnection(false);
       source.onmessage = event => news(JSON.parse(event.data));
@@ -181,6 +265,8 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
       address.protocol = address.protocol === "https:" ? "wss:" : "ws:";
       function open() {
         address.searchParams.set("token", token);
+        address.searchParams.set("page", thisPage);
+        address.searchParams.set("visible", isHidden() ? "0" : "1");
         socket = new WebSocket(address);
         socket.onopen = () => {
           tries = 0;
@@ -255,14 +341,22 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
 
       // Writes the record after a turn. {forSeat} says it is a computer player's: the
       // server decides who may write, so here it only tells the reader what this is.
-      async play({state, current}, _options = {}) {
-        await asked(`rooms/${id}/turn`, {turn: record.turn + 1, current, state: toSend(state)});
+      // {notify: "all"} is for the move that ends the game: everyone is told, not only the next.
+      async play({state, current}, {notify} = {}) {
+        await asked(`rooms/${id}/turn`, {turn: record.turn + 1, current, state: toSend(state), ...(notify === "all" ? {notify} : {})});
       },
 
       close() {
         live?.close();
         live = null;
         watched.delete(room);
+      },
+
+      // Tells the room whether this page is on screen, so it knows whether to send a notification.
+      // keepalive: a page being put away may be frozen before an ordinary request goes out.
+      async sayVisibility() {
+        if (!live) return;
+        await request(`rooms/${id}/visible`, {page: thisPage, visible: !isHidden()}, {keepalive: true}).catch(() => {});
       },
 
       // For the tests' switch below.
@@ -274,6 +368,7 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
       },
       reconnect: goLive,
     };
+    rooms.set(id, room);
     return room;
   }
 
@@ -281,8 +376,60 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
     // Where the rooms are: this page's server, or the Worker.
     base,
 
-    // For the tests: cuts the page's live updates off, as a lost network would, and brings them back.
-    test: forTests,
+    // For the tests: cuts the page's live updates off, as a lost network would, and brings them back;
+    // and acts as if this player's page were hidden, or back on screen.
+    test: {
+      ...forTests,
+      async hide(hidden) {
+        hiddenForTests = hidden;
+        await Promise.all([...rooms.values()].map(room => room.sayVisibility()));
+      },
+    },
+
+    // What this browser and back end allow for notifications: "available", "on", "install-first"
+    // (an iPhone or iPad, outside the Home Screen), "blocked" (the person said no), or null.
+    async pushState() {
+      const key = await pushKey();
+      if (!key) return null;
+      const manager = await managerOf();
+      if (!manager) return appleWithoutHomeScreen() ? "install-first" : null;
+      const permission = await manager.permissionState({userVisibleOnly: true, applicationServerKey: fromBase64url(key)}).catch(() => "prompt");
+      if (permission === "denied") return "blocked";
+      const subscription = await manager.getSubscription().catch(() => null);
+      return permission === "granted" && subscription && madeWith(subscription, key) ? "on" : "available";
+    },
+
+    // Turns notifications on in this browser, and gives its push address to these rooms and the
+    // ones open here. Call it from a click: browsers only ask for permission then.
+    async pushOn(roomIds = []) {
+      // Asked first, before anything is awaited, so that Safari still counts it as the click's.
+      const asking = !pushManager && typeof Notification !== "undefined" && Notification.permission === "default"
+        ? Notification.requestPermission() : null;
+      const key = await pushKey();
+      let manager = await managerOf();
+      if (!key || !manager) throw new RoomRefusal("no-push");
+      if (await asking === "denied") throw new RoomRefusal("push-blocked");
+      if (!pushManager) manager = (await navigator.serviceWorker.ready).pushManager;
+      let subscription = await manager.getSubscription();
+      if (subscription && !madeWith(subscription, key)) {
+        await subscription.unsubscribe();
+        subscription = null;
+      }
+      try {
+        subscription ??= await manager.subscribe({userVisibleOnly: true, applicationServerKey: fromBase64url(key)});
+      } catch (error) {
+        throw new RoomRefusal(error?.name === "NotAllowedError" ? "push-blocked" : "push-failed");
+      }
+      await giveAddress([...roomIds, ...rooms.keys()], addressOf(subscription));
+    },
+
+    // Turns them off in this browser, and takes the address back from these rooms and the open ones.
+    async pushOff(roomIds = []) {
+      const manager = await managerOf();
+      const subscription = manager && await manager.getSubscription().catch(() => null);
+      if (subscription) await subscription.unsubscribe();
+      if (await pushKey()) await giveAddress([...roomIds, ...rooms.keys()], null).catch(() => {});
+    },
 
     // Gives the creators' secret, to be allowed to create games. A session you have stays.
     async signIn({secret}) {
@@ -295,12 +442,14 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
 
     async create({seats, state, current = 0}) {
       const made = await asked("rooms", {game, seats, state: toSend(state), current});
+      await shareAddress(made.room);
       return roomFor(made.room, made.record, made.seat, made.invites);
     },
 
     async open(id) {
       const {record, seat} = await asked(`rooms/${id}`);
       if (!record) throw new RoomRefusal("not-a-member");
+      await shareAddress(id);
       return roomFor(id, record, seat);
     },
 
@@ -316,6 +465,7 @@ export async function connect({game, base = "..", sessionName = "multiplayer.ses
       const invite = parseInvite(link);
       if (!invite) throw new RoomRefusal("not-an-invite");
       const {record, seat} = await asked(`rooms/${invite.room}/join`, {seat: invite.seat, key: invite.key, name}, invite);
+      await shareAddress(invite.room);
       return roomFor(invite.room, record, seat);
     },
   };
