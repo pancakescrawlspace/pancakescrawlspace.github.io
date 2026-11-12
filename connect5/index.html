@@ -11,18 +11,34 @@
     <h1>Connect5</h1>
     <div class="controls">
       <label>
-        Difficulty
-        <select id="difficulty">
+        Mode
+        <select id="mode">
+          <option value="human" selected>You vs computer</option>
+          <option value="computer">Computer vs computer</option>
+        </select>
+      </label>
+      <label>
+        Black
+        <select id="difficulty-black" disabled>
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
+      <label>
+        White
+        <select id="difficulty-white">
           <option value="easy">Easy</option>
           <option value="medium" selected>Medium</option>
           <option value="hard">Hard</option>
         </select>
       </label>
       <button id="new-game" type="button">New game</button>
+      <button id="pause" type="button" hidden>Pause</button>
     </div>
     <p id="status" role="status" aria-live="polite"></p>
     <div id="board" class="board" aria-label="Connect5 board"></div>
-    <p class="hint">You play black and move first. Get five in a row to win.</p>
+    <p id="hint" class="hint">You play black and move first. Get five in a row to win.</p>
   </main>
   <script src="js/game.js"></script>
   <script src="js/ai-wasm.js"></script>
