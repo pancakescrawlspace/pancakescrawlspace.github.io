@@ -1,0 +1,112 @@
+:root {
+  --board-bg: #e3b96b;
+  --line: #5b4220;
+  --accent: #2b6cb0;
+  --win: #e53e3e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #f4f1ea;
+  color: #222;
+}
+
+main {
+  width: min(100%, 640px);
+  margin: 0 auto;
+  padding: 8px;
+  text-align: center;
+}
+
+h1 { margin: 8px 0; font-size: 1.6rem; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+select, button {
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #888;
+  background: #fff;
+}
+
+#new-game {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+#status { min-height: 1.5em; margin: 4px 0 8px; font-weight: 600; }
+#status.win { color: #2f855a; }
+#status.lose { color: var(--win); }
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--board-bg);
+  border: 2px solid var(--line);
+  border-radius: 4px;
+  touch-action: manipulation;
+}
+
+.cell {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cell::before,
+.cell::after {
+  content: "";
+  position: absolute;
+  background: var(--line);
+}
+
+.cell::before { left: 0; right: 0; top: calc(50% - 0.5px); height: 1px; }
+.cell::after { top: 0; bottom: 0; left: calc(50% - 0.5px); width: 1px; }
+.cell.first-col::before { left: 50%; }
+.cell.last-col::before { right: 50%; }
+.cell.first-row::after { top: 50%; }
+.cell.last-row::after { bottom: 50%; }
+
+.board:not(.locked) .cell.empty:hover { background: rgba(0, 0, 0, 0.1); }
+
+.stone {
+  position: absolute;
+  inset: 8%;
+  z-index: 1;
+  border-radius: 50%;
+  box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.45);
+}
+
+.stone.black { background: radial-gradient(circle at 35% 35%, #666, #000 70%); }
+.stone.white { background: radial-gradient(circle at 35% 35%, #fff, #cfcfcf 80%); }
+
+.cell.last .stone::after {
+  content: "";
+  position: absolute;
+  inset: 35%;
+  border-radius: 50%;
+  background: var(--win);
+}
+
+.cell.win .stone { outline: 3px solid var(--win); outline-offset: 1px; }
+
+.hint { font-size: 0.85rem; color: #555; }
