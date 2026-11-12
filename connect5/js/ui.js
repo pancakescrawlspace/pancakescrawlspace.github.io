@@ -14,6 +14,8 @@
 
   const cells = [];
   let game;
+  let loading = true;
+  let loadError = null;
   let thinking = false;
   let pendingMove = null;
 
@@ -36,9 +38,11 @@
   }
 
   function statusText() {
+    if (loadError) return [loadError, 'lose'];
     if (game.winner === HUMAN) return ['You win!', 'win'];
     if (game.winner === COMPUTER) return ['The computer wins.', 'lose'];
     if (game.draw) return ["It's a draw.", ''];
+    if (loading) return ['Loading the computer…', ''];
     return thinking ? ['Computer is thinking…', ''] : ['Your move (black).', ''];
   }
 
@@ -57,7 +61,7 @@
       const where = `row ${r + 1}, column ${c + 1}`;
       cell.setAttribute('aria-label', value === EMPTY ? where : `${where}, ${colour}`);
     });
-    boardEl.classList.toggle('locked', thinking || isOver(game));
+    boardEl.classList.toggle('locked', loading || thinking || isOver(game));
     const [text, kind] = statusText();
     statusEl.textContent = text;
     statusEl.className = kind;
@@ -73,7 +77,7 @@
 
   function onCellClick(event) {
     const cell = event.target.closest('.cell');
-    if (!cell || thinking || isOver(game)) return;
+    if (!cell || loading || thinking || isOver(game)) return;
     if (!playMove(game, Number(cell.dataset.row), Number(cell.dataset.col))) return;
     thinking = !isOver(game);
     render();
@@ -91,4 +95,11 @@
   boardEl.addEventListener('click', onCellClick);
   newGameEl.addEventListener('click', newGame);
   newGame();
+  Connect5AI.ready.then(() => {
+    loading = false;
+    render();
+  }, (error) => {
+    loadError = 'The computer could not be loaded: ' + error.message;
+    render();
+  });
 })();
